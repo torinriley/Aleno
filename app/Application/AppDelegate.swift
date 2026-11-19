@@ -28,7 +28,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         Bench.mark("daemon connected")
         NSApp.servicesProvider = self      // Finder right-click services (see NSServices in Info.plist)
         NSUpdateDynamicServices()
-        if !openedFromURLs { newWindow() }
+        if !openedFromURLs {
+            let welcome = shouldPlayWelcome()
+            newWindow(welcome: welcome)
+            if welcome { markWelcomeShown() }
+        }
         Bench.mark("window shown")
         NSApp.activate(ignoringOtherApps: true)
         if ProcessInfo.processInfo.environment["ALENO_TRACE_STARTUP"] != nil {
@@ -67,8 +71,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @discardableResult
-    func openWindow(session: UInt32, adopting tab: Tab? = nil, cwd: String = "") -> WindowController {
-        let c = WindowController(sessionId: session, adopting: tab, cwd: cwd)
+    func openWindow(session: UInt32, adopting tab: Tab? = nil, cwd: String = "", welcome: Bool = false) -> WindowController {
+        let c = WindowController(sessionId: session, adopting: tab, cwd: cwd, welcome: welcome)
         c.onProgress = { [weak self] _ in self?.updateDockProgress() }
         c.onTearOff = { [weak self] tab, from, point in
             guard let self else { return }
@@ -151,10 +155,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc func showAbout() { AboutWindowController.shared.show() }
 
-    @objc func newWindow() {
+    @objc func newWindow() { newWindow(welcome: false) }
+
+    func newWindow(welcome: Bool) {
         if Bench.on { Bench.windowStart = CACurrentMediaTime() }
         guard let id = DaemonClient.shared.createSession(name: "") else { NSSound.beep(); return }
-        openWindow(session: id)
+        openWindow(session: id, welcome: welcome)
+    }
+
+    // MARK: Welcome
+
+    private var welcomeMarker: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/aleno/.welcomed")
+    }
+
+    /// Whether the first window should play the welcome: always, never, or only until it has been shown once.
+    private func shouldPlayWelcome() -> Bool {
+        if ProcessInfo.processInfo.environment["ALENO_BENCH"] != nil { return false }
+        switch ConfigStore.shared.settings.workspace.welcome {
+        case "always": return true
+        case "never": return false
+        default: return !FileManager.default.fileExists(atPath: welcomeMarker.path)
+        }
+    }
+
+    private func markWelcomeShown() {
+        let dir = welcomeMarker.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? Data().write(to: welcomeMarker)
+    }
+
+    /// Help, Welcome to Aleno: plays the welcome again in a new tab.
+    @objc func showWelcome() {
+        if let c = current { c.newTab(welcome: true); c.window.makeKeyAndOrderFront(nil) } else { newWindow(welcome: true) }
+    }
+
+    @objc func openDocumentation() {
+        if let url = URL(string: "https://github.com/torinriley/Aleno#readme") { NSWorkspace.shared.open(url) }
     }
 
     // MARK: Menus
@@ -259,6 +296,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             m.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
             m.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
             NSApp.windowsMenu = m
+        }
+        submenu("Help") { m in
+            m.addItem(withTitle: "Welcome to Aleno", action: #selector(showWelcome), keyEquivalent: "")
+            m.addItem(withTitle: "Aleno Documentation", action: #selector(openDocumentation), keyEquivalent: "")
+            NSApp.helpMenu = m
         }
         NSApp.mainMenu = main
     }

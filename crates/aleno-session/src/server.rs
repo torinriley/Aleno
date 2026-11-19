@@ -271,14 +271,14 @@ impl Server {
                         Some(s) => Msg::Layout { json: s.layout.lock().unwrap().clone() },
                         None => Msg::Err { code: err::NO_SUCH_SESSION, message: "no such session".into() },
                     },
-                    Msg::CreatePane { session, cols, rows, shell, cwd, scrollback, seed } => match self.session(session) {
+                    Msg::CreatePane { session, cols, rows, shell, cwd, scrollback, seed, welcome } => match self.session(session) {
                         None => Msg::Err { code: err::NO_SUCH_SESSION, message: "no such session".into() },
                         Some(s) => {
                             if s.panes.lock().unwrap().len() >= MAX_PANES_PER_SESSION {
                                 Msg::Err { code: err::LIMIT, message: "too many panes".into() }
                             } else {
                                 let id = s.next_pane.fetch_add(1, Ordering::Relaxed);
-                                let opts = SpawnOptions { cols, rows, shell, cwd, scrollback: scrollback as usize, seed };
+                                let opts = SpawnOptions { cols, rows, shell, cwd, scrollback: scrollback as usize, seed, welcome };
                                 match Pane::spawn(id, &opts) {
                                     Ok(p) => {
                                         s.panes.lock().unwrap().insert(id, p);

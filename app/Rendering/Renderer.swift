@@ -15,7 +15,7 @@ struct CellInstance {
 enum CellFlag {
     static let glyph: UInt16 = 1, color: UInt16 = 2, wide: UInt16 = 4, underline: UInt16 = 8, strike: UInt16 = 16
     static let doubleUnderline: UInt16 = 32, selected: UInt16 = 64, match: UInt16 = 128, current: UInt16 = 256
-    static let dim: UInt16 = 512, skip: UInt16 = 1024, noExtendVertical: UInt16 = 2048
+    static let dim: UInt16 = 512, skip: UInt16 = 1024, noExtendVertical: UInt16 = 2048, block: UInt16 = 4096
 }
 
 /// Mirrors `Uniforms` in Terminal.metal.
@@ -218,6 +218,13 @@ final class PaneRenderer {
             if !uniformRow { flags |= CellFlag.noExtendVertical }
             let ch = cell.ch
             let blank = ch == 32 || ch == 0 || (f & 64 != 0)
+            // Block elements and braille are drawn by the shader as exact shapes filling the whole cell.
+            if !blank, f & 256 == 0, (0x2580...0x259F).contains(ch) || (0x2800...0x28FF).contains(ch) {
+                i.flags = flags | CellFlag.block
+                i.rx = ch < 0x2800 ? UInt16(ch - 0x2580) : UInt16(0x100 + ch - 0x2800)
+                inst[base + c] = i
+                continue
+            }
             if !blank {
                 let bold = f & 1 != 0, italic = f & 4 != 0
                 var wide = f & 256 != 0

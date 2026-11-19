@@ -78,11 +78,11 @@ final class DaemonClient {
     }
 
     /// `seed`: output of an earlier pane (`TerminalView.snapshotText`) to replay above the new shell's first prompt.
-    func createPane(session: UInt32, cols: Int, rows: Int, shell: String, cwd: String, scrollback: Int, seed: String = "") -> UInt32? {
+    func createPane(session: UInt32, cols: Int, rows: Int, shell: String, cwd: String, scrollback: Int, seed: String = "", welcome: Bool = false) -> UInt32? {
         withCtl { c in
-            let r = seed.isEmpty
+            let r = seed.isEmpty && !welcome
                 ? aleno_ctl_create_pane(c, session, UInt16(cols), UInt16(rows), shell, cwd, UInt32(scrollback))
-                : aleno_ctl_create_pane_seeded(c, session, UInt16(cols), UInt16(rows), shell, cwd, UInt32(scrollback), seed)
+                : aleno_ctl_create_pane_seeded(c, session, UInt16(cols), UInt16(rows), shell, cwd, UInt32(scrollback), seed, welcome ? 1 : 0)
             return r >= 0 ? UInt32(r) : nil
         }
     }

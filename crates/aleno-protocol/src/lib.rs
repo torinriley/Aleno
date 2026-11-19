@@ -42,7 +42,8 @@ pub enum Msg {
     SetLayout { session: u32, json: String },
     GetLayout { session: u32 },
     /// `seed`: terminal output to replay into the new pane's screen before the shell starts (reopened tabs).
-    CreatePane { session: u32, cols: u16, rows: u16, shell: String, cwd: String, scrollback: u32, seed: Vec<u8> },
+    /// `welcome`: run the first-run welcome animation before the shell starts.
+    CreatePane { session: u32, cols: u16, rows: u16, shell: String, cwd: String, scrollback: u32, seed: Vec<u8>, welcome: bool },
     KillPane { session: u32, pane: u32 },
     ListPanes { session: u32 },
     AttachPane { session: u32, pane: u32, cols: u16, rows: u16 },
@@ -218,7 +219,7 @@ impl Msg {
                 e.u32(*session);
                 e.str(json);
             }
-            CreatePane { session, cols, rows, shell, cwd, scrollback, seed } => {
+            CreatePane { session, cols, rows, shell, cwd, scrollback, seed, welcome } => {
                 e.u32(*session);
                 e.u16(*cols);
                 e.u16(*rows);
@@ -226,6 +227,7 @@ impl Msg {
                 e.str(cwd);
                 e.u32(*scrollback);
                 e.bytes(seed);
+                e.u8(*welcome as u8);
             }
             KillPane { session, pane } => {
                 e.u32(*session);
@@ -316,6 +318,7 @@ impl Msg {
                 cwd: d.str()?,
                 scrollback: d.u32()?,
                 seed: d.bytes()?,
+                welcome: d.u8()? != 0,
             },
             8 => KillPane { session: d.u32()?, pane: d.u32()? },
             9 => ListPanes { session: d.u32()? },
@@ -532,7 +535,7 @@ mod tests {
             Msg::ListSessions,
             Msg::RenameSession { session: 2, name: "work".into() },
             Msg::SetLayout { session: 3, json: "{\"a\":1}".into() },
-            Msg::CreatePane { session: 1, cols: 80, rows: 24, shell: "".into(), cwd: "/tmp".into(), scrollback: 1000, seed: b"old\r\nscreen".to_vec() },
+            Msg::CreatePane { session: 1, cols: 80, rows: 24, shell: "".into(), cwd: "/tmp".into(), scrollback: 1000, seed: b"old\r\nscreen".to_vec(), welcome: true },
             Msg::AttachPane { session: 1, pane: 2, cols: 100, rows: 40 },
             Msg::Input { data: vec![1, 2, 3, 0xff] },
             Msg::Resize { cols: 1, rows: 2 },

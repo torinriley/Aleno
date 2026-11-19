@@ -62,6 +62,7 @@
       "description": "Session and window behavior.",
       "additionalProperties": false,
       "properties": {
+        "welcome": { "enum": ["first-launch", "always", "never"], "default": "first-launch", "description": "When to play the welcome animation (the logo, a short intro and tips) in a new window: only the first time Aleno runs, every launch, or never. Help, Welcome to Aleno shows it on demand." },
         "confirmOnClose": { "type": "boolean", "default": false, "description": "Ask before closing a window. Quitting with open windows always asks." }
       }
     },

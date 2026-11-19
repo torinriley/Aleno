@@ -36,7 +36,7 @@ final class WindowController: NSObject, NSWindowDelegate, TerminalViewDelegate, 
         return s
     }
 
-    init(sessionId: UInt32, frame: NSRect? = nil, adopting adopted: Tab? = nil, cwd: String = "") {
+    init(sessionId: UInt32, frame: NSRect? = nil, adopting adopted: Tab? = nil, cwd: String = "", welcome: Bool = false) {
         self.sessionId = sessionId
         WindowController.liveWindows[sessionId, default: 0] += 1
         let style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
@@ -77,7 +77,7 @@ final class WindowController: NSObject, NSWindowDelegate, TerminalViewDelegate, 
             tabs = [adopted]
             for l in adopted.leaves { l.view.terminalDelegate = self }
             select(0)
-        } else if tabs.isEmpty { newTab(cwd: cwd) }
+        } else if tabs.isEmpty { newTab(cwd: cwd, welcome: welcome) }
         applyChrome()
         layoutChrome()
         if let e = ConfigStore.shared.lastError { toast.show("settings.json has errors — keeping the previous configuration\n\(e)", sticky: true) }
@@ -227,7 +227,7 @@ final class WindowController: NSObject, NSWindowDelegate, TerminalViewDelegate, 
 
     // MARK: Pane / tab creation
 
-    private func makeLeaf(cwd: String = "", frame: NSRect? = nil, inset: CGFloat? = nil, seed: String = "") -> LeafNode? {
+    private func makeLeaf(cwd: String = "", frame: NSRect? = nil, inset: CGFloat? = nil, seed: String = "", welcome: Bool = false) -> LeafNode? {
         let s = settings
         let daemon = DaemonClient.shared
         // Use the same cell geometry as the renderer before the shell can emit a prompt.
@@ -238,7 +238,7 @@ final class WindowController: NSObject, NSWindowDelegate, TerminalViewDelegate, 
                                          scale: scale, settings: s, fonts: fonts, topInset: inset ?? chromeHeight)
         func create() -> UInt32? {
             daemon.createPane(session: sessionId, cols: size.cols, rows: size.rows, shell: s.terminal.shell,
-                              cwd: cwd, scrollback: s.terminal.scrollback, seed: seed)
+                              cwd: cwd, scrollback: s.terminal.scrollback, seed: seed, welcome: welcome)
         }
         guard let pane = create() else {
             let message = "Could not start a shell: \(daemon.lastError)"
@@ -256,10 +256,10 @@ final class WindowController: NSObject, NSWindowDelegate, TerminalViewDelegate, 
     }
 
     @discardableResult
-    func newTab(cwd: String? = nil) -> Tab? {
+    func newTab(cwd: String? = nil, welcome: Bool = false) -> Tab? {
         let dir = cwd ?? tabs[safe: activeIndex]?.focused.view.cwdPath ?? ""
         let inset = tabs.isEmpty ? TabBarView.titleRowHeight : TabBarView.totalHeight
-        guard let leaf = makeLeaf(cwd: dir, inset: inset) else { return nil }
+        guard let leaf = makeLeaf(cwd: dir, inset: inset, welcome: welcome) else { return nil }
         let t = Tab(root: leaf, focused: leaf)
         tabs.append(t)
         select(tabs.count - 1)

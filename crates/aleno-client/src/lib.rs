@@ -95,7 +95,11 @@ impl Ctl {
     }
     /// Like `create_pane`, replaying `seed` (a `snapshot` of an earlier pane) above the new shell's first prompt.
     pub fn create_pane_seeded(&self, session: u32, cols: u16, rows: u16, shell: &str, cwd: &str, scrollback: u32, seed: &[u8]) -> io::Result<u32> {
-        match self.call(Msg::CreatePane { session, cols, rows, shell: shell.into(), cwd: cwd.into(), scrollback, seed: seed.to_vec() })? {
+        self.create_pane_full(session, cols, rows, shell, cwd, scrollback, seed, false)
+    }
+    /// Like `create_pane_seeded`; with `welcome` the pane first plays the first-run welcome animation.
+    pub fn create_pane_full(&self, session: u32, cols: u16, rows: u16, shell: &str, cwd: &str, scrollback: u32, seed: &[u8], welcome: bool) -> io::Result<u32> {
+        match self.call(Msg::CreatePane { session, cols, rows, shell: shell.into(), cwd: cwd.into(), scrollback, seed: seed.to_vec(), welcome })? {
             Msg::PaneCreated { pane } => Ok(pane),
             m => Err(rpc_err(m)),
         }

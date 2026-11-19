@@ -591,3 +591,31 @@ fn progress_from_the_shell_reaches_the_client_and_raises_an_event() {
     wait_for(&c, "cleared", |t| t.contains("done-2"));
     assert_eq!(c.shared.term.lock().unwrap().progress(), (0, 0));
 }
+
+#[test]
+fn welcome_pane_plays_the_intro_then_becomes_the_shell() {
+    let sock = tmp_sock("welcome");
+    let child = Command::new(daemon_bin()).arg("run").env("ALENO_SOCKET", &sock).env("ALENO_IDLE_EXIT_SECS", "0").spawn().unwrap();
+    let _guard = DaemonProc(child, sock.clone());
+    let end = Instant::now() + Duration::from_secs(5);
+    let ctl = loop {
+        match Ctl::connect(&sock) {
+            Ok(c) => break c,
+            Err(_) if Instant::now() < end => std::thread::sleep(Duration::from_millis(20)),
+            Err(e) => panic!("daemon did not start: {}", e),
+        }
+    };
+    let s = ctl.create_session("welcome").unwrap();
+    let p = ctl.create_pane_full(s, 100, 30, "/bin/sh", "/tmp", 1000, &[], true).unwrap();
+    let c = attach(&sock, s, p, 100, 30);
+    // The wordmark is drawn with braille dots, then the intro text appears.
+    let t = wait_for(&c, "welcome text", |t| t.contains("Welcome to Aleno") && t.contains("settings.json"));
+    assert!(t.chars().any(|c| ('\u{2801}'..='\u{28FF}').contains(&c)), "the wordmark should be on screen:\n{}", t);
+    // A key press skips what is left, and afterwards the pane is a normal shell (the wrapper exec'd into it).
+    c.send_input(b"q");
+    std::thread::sleep(Duration::from_millis(300));
+    c.send_input(b"echo after-welcome-$((20+22))\n");
+    wait_for(&c, "shell works", |t| t.contains("after-welcome-42"));
+    let infos = ctl.list_panes(s).unwrap();
+    assert!(infos[0].alive);
+}

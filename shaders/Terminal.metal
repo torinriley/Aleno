@@ -29,7 +29,8 @@ struct Uniforms {
 };
 
 constant ushort F_GLYPH = 1, F_COLOR = 2, F_WIDE = 4, F_UNDERLINE = 8, F_STRIKE = 16, F_DOUBLE_UL = 32,
-                F_SELECTED = 64, F_MATCH = 128, F_CURRENT = 256, F_DIM = 512, F_SKIP = 1024, F_NOEXTV = 2048;
+                F_SELECTED = 64, F_MATCH = 128, F_CURRENT = 256, F_DIM = 512, F_SKIP = 1024, F_NOEXTV = 2048,
+                F_BLOCK = 4096;   // block element / braille drawn procedurally; `rect.x`: code point - 0x2580, or 0x100 + (code point - 0x2800)
 
 struct VOut {
     float4 position [[position]];
@@ -41,6 +42,7 @@ struct VOut {
     float span [[flat]];
     ushort flags [[flat]];
     uint2  cellPos [[flat]];
+    ushort code [[flat]];
 };
 
 vertex VOut cell_vertex(uint vid [[vertex_id]], uint iid [[instance_id]],
@@ -73,7 +75,43 @@ vertex VOut cell_vertex(uint vid [[vertex_id]], uint iid [[instance_id]],
     o.span = wcells;
     o.flags = c.flags;
     o.cellPos = uint2(c.pos);
+    o.code = c.rect.x;
     return o;
+}
+
+// Block elements (U+2580..U+259F) are drawn as exact fractions of the whole cell, so they meet with no gaps at any
+// line height or font. `code` is the code point minus 0x2580, `p` the position inside the cell in 0..1.
+float block_coverage(uint code, float2 p) {
+    if (code == 0)  return p.y < 0.5 ? 1.0 : 0.0;                                   // upper half
+    if (code <= 7)  return p.y >= 1.0 - float(code) / 8.0 ? 1.0 : 0.0;               // lower 1/8 .. 7/8
+    if (code == 8)  return 1.0;                                                      // full block
+    if (code <= 15) return p.x < float(16 - code) / 8.0 ? 1.0 : 0.0;                 // left 7/8 .. 1/8
+    if (code == 16) return p.x >= 0.5 ? 1.0 : 0.0;                                   // right half
+    if (code <= 19) return 0.25 * float(code - 16);                                  // light, medium, dark shade
+    if (code == 20) return p.y < 0.125 ? 1.0 : 0.0;                                  // upper 1/8
+    if (code == 21) return p.x >= 0.875 ? 1.0 : 0.0;                                 // right 1/8
+    // Quadrants: bit 0 upper-left, 1 upper-right, 2 lower-left, 3 lower-right.
+    const uint quad[10] = { 4, 8, 1, 13, 9, 7, 11, 2, 6, 14 };
+    uint m = quad[min(code - 22, 9u)];
+    uint q = (p.y < 0.5 ? 0u : 2u) + (p.x < 0.5 ? 0u : 1u);                         // 0 UL, 1 UR, 2 LL, 3 LR
+    uint bit = q == 0 ? 1u : (q == 1 ? 2u : (q == 2 ? 4u : 8u));
+    return (m & bit) != 0 ? 1.0 : 0.0;
+}
+
+// Braille patterns (U+2800..U+28FF) as round dots on a 2x4 grid filling the whole cell, for dot-matrix graphics.
+float braille_coverage(uint bits, float2 local, float2 size) {
+    float r = min(size.x / 4.0, size.y / 8.0) * 0.92;
+    float cov = 0.0;
+    for (uint i = 0; i < 8; i++) {
+        if ((bits & (1u << i)) == 0) continue;
+        // dots 1,2,3 then 4,5,6 run down the left and right columns; dots 7 and 8 are the bottom row.
+        uint col = i < 3 ? 0 : (i < 6 ? 1 : (i == 6 ? 0 : 1));
+        uint row = i < 3 ? i : (i < 6 ? i - 3 : 3);
+        float2 c = float2((0.25 + 0.5 * float(col)) * size.x, (0.125 + 0.25 * float(row)) * size.y);
+        float d = length(local - c);
+        cov = max(cov, clamp(r - d + 0.5, 0.0, 1.0));      // one pixel of antialiasing
+    }
+    return cov;
 }
 
 fragment float4 cell_fragment(VOut in [[stage_in]],
@@ -105,6 +143,7 @@ fragment float4 cell_fragment(VOut in [[stage_in]],
         if (f & F_COLOR) { colorGlyph = t.rgb; colorA = t.a; }
         else { cov = t.a; }
     }
+    if (f & F_BLOCK) cov = in.code >= 0x100 ? braille_coverage(uint(in.code - 0x100), in.local, in.size) : block_coverage(uint(in.code), in.local / in.size);
     if (f & F_DIM) cov *= 0.6;
     rgb = mix(rgb, fg, cov);
     rgb = colorGlyph + rgb * (1.0 - colorA);
