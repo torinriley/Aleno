@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aleno.app/schemas/settings.schema.json",
+  "title": "Aleno settings",
+  "description": "Configuration for the Aleno terminal emulator. Save the file and Aleno applies it immediately; an invalid file is rejected as a whole and the previous valid configuration stays active.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "description": "Schema reference for editor autocomplete." },
+    "font": {
+      "type": "object",
+      "description": "Typography of the terminal grid.",
+      "additionalProperties": false,
+      "properties": {
+        "family": { "type": "string", "minLength": 1, "default": "SF Mono", "description": "Font family name. Must be installed; a monospaced family is recommended. Falls back to the system monospaced font if not found. Missing glyphs are drawn with automatic font fallback." },
+        "size": { "type": "number", "minimum": 6, "maximum": 72, "default": 13, "description": "Font size in points." },
+        "lineHeight": { "type": "number", "minimum": 0.8, "maximum": 3, "default": 1.2, "description": "Line height as a multiple of the font's natural line height." },
+        "characterSpacing": { "type": "number", "minimum": -5, "maximum": 20, "default": 0, "description": "Extra horizontal space per cell, in points (may be negative)." },
+        "ligatures": { "type": "boolean", "default": true, "description": "Draw programming ligatures (=>, ->, !=, ...) when the font provides them (Fira Code, JetBrains Mono, Cascadia Code, ...). Fonts without ligatures are unaffected." }
+      }
+    },
+    "appearance": {
+      "type": "object",
+      "description": "Window and color appearance.",
+      "additionalProperties": false,
+      "properties": {
+        "theme": { "enum": ["system", "light", "dark"], "default": "system", "description": "Color scheme. \"system\" follows the macOS appearance live." },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1, "default": 1, "description": "Background opacity (text stays opaque). 0 is fully clear." },
+        "blur": { "type": "boolean", "default": true, "description": "Blur the desktop behind the window when opacity is below 1 (macOS vibrancy)." },
+        "blurStyle": { "enum": ["blur", "vibrancy", "glass"], "default": "blur", "description": "Look of the backdrop behind a translucent window: \"blur\" (alias \"vibrancy\") is Aleno's own frosted blur, \"glass\" uses macOS Liquid Glass (macOS 26+; falls back to blur on older systems)." },
+        "blurRadius": { "type": "number", "minimum": 0, "maximum": 100, "description": "Strength of the blur behind a translucent window (0 = none, about 20 is subtle, 60+ is heavy). When unset, the standard macOS frosted material is used. Ignored with blurStyle \"glass\"." },
+        "padding": { "type": "number", "minimum": 0, "maximum": 100, "default": 12, "description": "Padding between the pane edge and the character grid, in points." },
+        "colors": {
+          "type": "object",
+          "description": "Optional color overrides applied on top of the selected theme.",
+          "additionalProperties": false,
+          "properties": {
+            "foreground": { "$ref": "#/definitions/color", "description": "Default text color." },
+            "background": { "$ref": "#/definitions/color", "description": "Default background color." },
+            "cursor": { "$ref": "#/definitions/color", "description": "Cursor color." },
+            "selection": { "$ref": "#/definitions/color", "description": "Selection background color." },
+            "palette": { "type": "array", "minItems": 16, "maxItems": 16, "items": { "$ref": "#/definitions/color" }, "description": "The 16 ANSI colors (0-7 normal, 8-15 bright)." }
+          }
+        }
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "description": "Terminal behavior.",
+      "additionalProperties": false,
+      "properties": {
+        "shell": { "type": "string", "minLength": 1, "default": "default", "description": "\"default\" uses your login shell. Otherwise an absolute path or a program name found in the system bin directories. Executed directly, never through a shell. Applies to newly created panes only." },
+        "scrollback": { "type": "integer", "minimum": 0, "maximum": 1000000, "default": 10000, "description": "Maximum number of history lines kept per pane." },
+        "cursorStyle": { "enum": ["block", "bar", "underline"], "default": "bar", "description": "Cursor shape (programs may override it with DECSCUSR)." },
+        "cursorBlink": { "type": "boolean", "default": true, "description": "Blink the cursor while the pane is focused." },
+        "optionAsMeta": { "type": "boolean", "default": true, "description": "Treat ⌥ as Meta (sends ESC-prefixed keys) instead of composing special characters." },
+        "notifyAfterSeconds": { "type": "integer", "minimum": 0, "maximum": 86400, "default": 10, "description": "Send a notification when a command that ran at least this many seconds finishes in a pane that is not in front (needs shell integration). 0 disables." }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "description": "Session and window behavior.",
+      "additionalProperties": false,
+      "properties": {
+        "confirmOnClose": { "type": "boolean", "default": false, "description": "Ask before closing a window. Quitting with open windows always asks." }
+      }
+    },
+    "keybindings": {
+      "type": "object",
+      "description": "Shortcut overrides, e.g. \"cmd+shift+d\". Modifiers: cmd, shift, alt, ctrl. Keys: a single character or left, right, up, down, pageup, pagedown, home, end, tab, enter, space, escape. Use an empty string to unbind an action.",
+      "additionalProperties": false,
+      "properties": {
+        "newTab": { "$ref": "#/definitions/shortcut", "default": "cmd+t" },
+        "newWindow": { "$ref": "#/definitions/shortcut", "default": "cmd+n" },
+        "closePane": { "$ref": "#/definitions/shortcut", "default": "cmd+w", "description": "Closes the focused pane; closes the tab when it is the last pane." },
+        "closeTab": { "$ref": "#/definitions/shortcut", "default": "cmd+shift+w" },
+        "reopenClosedTab": { "$ref": "#/definitions/shortcut", "default": "cmd+shift+t", "description": "Brings back the most recently closed tab with its splits, folder and scrollback." },
+        "nextTab": { "$ref": "#/definitions/shortcut", "default": "cmd+shift+]" },
+        "previousTab": { "$ref": "#/definitions/shortcut", "default": "cmd+shift+[" },
+        "splitRight": { "$ref": "#/definitions/shortcut", "default": "cmd+d" },
+        "splitDown": { "$ref": "#/definitions/shortcut", "default": "cmd+shift+d" },
+        "focusLeft": { "$ref": "#/definitions/shortcut", "default": "cmd+alt+left" },
+        "focusRight": { "$ref": "#/definitions/shortcut", "default": "cmd+alt+right" },
+        "focusUp": { "$ref": "#/definitions/shortcut", "default": "cmd+alt+up" },
+        "focusDown": { "$ref": "#/definitions/shortcut", "default": "cmd+alt+down" },
+        "resizeLeft": { "$ref": "#/definitions/shortcut", "default": "cmd+ctrl+left" },
+        "resizeRight": { "$ref": "#/definitions/shortcut", "default": "cmd+ctrl+right" },
+        "resizeUp": { "$ref": "#/definitions/shortcut", "default": "cmd+ctrl+up" },
+        "resizeDown": { "$ref": "#/definitions/shortcut", "default": "cmd+ctrl+down" },
+        "find": { "$ref": "#/definitions/shortcut", "default": "cmd+f" },
+        "findNext": { "$ref": "#/definitions/shortcut", "default": "cmd+g" },
+        "findPrevious": { "$ref": "#/definitions/shortcut", "default": "cmd+shift+g" },
+        "copy": { "$ref": "#/definitions/shortcut", "default": "cmd+c" },
+        "paste": { "$ref": "#/definitions/shortcut", "default": "cmd+v" },
+        "selectAll": { "$ref": "#/definitions/shortcut", "default": "cmd+a" },
+        "clearScrollback": { "$ref": "#/definitions/shortcut", "default": "cmd+k" },
+        "scrollPageUp": { "$ref": "#/definitions/shortcut", "default": "shift+pageup" },
+        "scrollPageDown": { "$ref": "#/definitions/shortcut", "default": "shift+pagedown" },
+        "scrollToTop": { "$ref": "#/definitions/shortcut", "default": "cmd+home" },
+        "scrollToBottom": { "$ref": "#/definitions/shortcut", "default": "cmd+end" },
+        "increaseFontSize": { "$ref": "#/definitions/shortcut", "default": "cmd+=" },
+        "decreaseFontSize": { "$ref": "#/definitions/shortcut", "default": "cmd+-" },
+        "resetFontSize": { "$ref": "#/definitions/shortcut", "default": "cmd+0" },
+        "openSettings": { "$ref": "#/definitions/shortcut", "default": "cmd+," },
+        "toggleFullScreen": { "$ref": "#/definitions/shortcut", "default": "cmd+ctrl+f" }
+      }
+    }
+  },
+  "definitions": {
+    "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Hex color such as #1e1e2e." },
+    "shortcut": { "type": "string", "description": "Shortcut such as \"cmd+shift+d\"; empty string disables the binding." }
+  }
+}

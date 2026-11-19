@@ -1,0 +1,81 @@
+name: Aleno
+options:
+  bundleIdPrefix: com.aleno
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    ARCHS: arm64
+    ONLY_ACTIVE_ARCH: NO
+    CLANG_ENABLE_MODULES: YES
+targets:
+  Aleno:
+    type: application
+    platform: macOS
+    configFiles:
+      Debug: config/Signing.xcconfig
+      Release: config/Signing.xcconfig
+    sources:
+      - path: app
+        excludes: ["Resources/Info.plist", "Application/aleno.h", "Resources/Fonts", "Resources/AppIcon.icon"]
+      - path: shaders
+      - path: app/Resources/Fonts
+        type: folder
+        buildPhase: resources
+      # Icon Composer document: one file reference (not a folder of files); compiled into the app icon by actool.
+      - path: app/Resources/AppIcon.icon
+        type: file
+        buildPhase: resources
+      - path: app/Application/aleno.h
+        buildPhase: none
+    info:
+      path: app/Resources/Info.plist
+      properties:
+        CFBundleName: Aleno
+        CFBundleDisplayName: Aleno
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "15.0"
+        NSHighResolutionCapable: true
+        NSPrincipalClass: NSApplication
+        LSApplicationCategoryType: public.app-category.developer-tools
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Folder
+            CFBundleTypeRole: Viewer
+            LSItemContentTypes: ["public.folder"]
+            LSHandlerRank: Alternate
+        NSServices:
+          - NSMenuItem: { default: "New Aleno Window Here" }
+            NSMessage: openWindowHere
+            NSPortName: Aleno
+            NSSendTypes: ["NSFilenamesPboardType", "public.plain-text"]
+            NSRequiredContext: { NSTextContent: FilePath }
+          - NSMenuItem: { default: "New Aleno Tab Here" }
+            NSMessage: openTabHere
+            NSPortName: Aleno
+            NSSendTypes: ["NSFilenamesPboardType", "public.plain-text"]
+            NSRequiredContext: { NSTextContent: FilePath }
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aleno.Aleno
+        PRODUCT_NAME: Aleno
+        SWIFT_OBJC_BRIDGING_HEADER: app/Application/aleno.h
+        LIBRARY_SEARCH_PATHS: ["$(PROJECT_DIR)/target/release"]
+        OTHER_LDFLAGS: ["-laleno_client"]
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    preBuildScripts:
+      - name: Build Rust (aleno-client, aleno-daemon)
+        script: '"$PROJECT_DIR/scripts/build-rust.sh"'
+        inputFiles: []
+        outputFiles:
+          - $(PROJECT_DIR)/target/release/libaleno_client.a
+        basedOnDependencyAnalysis: false
+    postBuildScripts:
+      - name: Embed daemon and schema
+        script: '"$PROJECT_DIR/scripts/embed.sh"'
+        basedOnDependencyAnalysis: false
