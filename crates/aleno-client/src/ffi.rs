@@ -148,9 +148,10 @@ pub unsafe extern "C" fn aleno_ctl_create_pane_seeded(
     cwd: *const c_char,
     scrollback: u32,
     seed: *const c_char,
+    welcome: i32,
 ) -> i64 {
     let seed = if seed.is_null() { Vec::new() } else { std::ffi::CStr::from_ptr(seed).to_bytes().to_vec() };
-    match c.create_pane_seeded(session, cols, rows, &cstr(shell), &cstr(cwd), scrollback, &seed) {
+    match c.create_pane_full(session, cols, rows, &cstr(shell), &cstr(cwd), scrollback, &seed, welcome != 0) {
         Ok(id) => id as i64,
         Err(e) => { CONTROL_ERROR.with(|v| *v.borrow_mut() = e.to_string()); -1 },
     }

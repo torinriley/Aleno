@@ -30,6 +30,8 @@ pub struct SpawnOptions {
     pub scrollback: usize,
     /// Output to replay onto the screen before the shell starts; it ends up in scrollback above the new prompt.
     pub seed: Vec<u8>,
+    /// Run the first-run welcome (`aleno-daemon welcome`) in front of the shell.
+    pub welcome: bool,
 }
 
 #[derive(Clone)]
@@ -73,6 +75,19 @@ pub struct Pane {
 
 /// Resolve the shell to run. Only absolute paths (or bare names found on a fixed set of system
 /// directories) are accepted; the value is exec'd directly, never interpreted by a shell.
+/// A command that runs the welcome animation and then execs `inner` (same program, arg0, arguments and environment).
+fn welcome_wrapper(me: &std::path::Path, inner: &Command, shell: &str, arg0: &str) -> Command {
+    let mut w = Command::new(me);
+    w.arg("welcome").arg("--").arg(shell).arg(arg0).args(inner.get_args());
+    for (k, v) in inner.get_envs() {
+        match v {
+            Some(v) => w.env(k, v),
+            None => w.env_remove(k),
+        };
+    }
+    w
+}
+
 pub fn resolve_shell(requested: &str) -> String {
     let ok = |p: &str| {
         use std::os::unix::fs::PermissionsExt;
@@ -164,7 +179,8 @@ impl Pane {
         let shell = resolve_shell(&opts.shell);
         let name = std::path::Path::new(&shell).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         let mut cmd = Command::new(&shell);
-        cmd.arg0(format!("-{}", name)); // login shell
+        let mut arg0 = format!("-{}", name);
+        cmd.arg0(&arg0); // login shell
         cmd.env("TERM", "xterm-256color")
             .env("COLORTERM", "truecolor")
             .env("TERM_PROGRAM", "Aleno")
@@ -177,7 +193,13 @@ impl Pane {
             cmd.env_remove(k);
         }
         if crate::integration::apply(&mut cmd, &shell) && name == "bash" {
+            arg0 = "bash".into();
             cmd.arg0("bash"); // --rcfile is ignored by login shells; the rcfile emulates the login startup itself
+        }
+        if opts.welcome {
+            if let Ok(me) = std::env::current_exe() {
+                cmd = welcome_wrapper(&me, &cmd, &shell, &arg0);
+            }
         }
         let cwd = if !opts.cwd.is_empty() && std::path::Path::new(&opts.cwd).is_dir() {
             opts.cwd.clone()

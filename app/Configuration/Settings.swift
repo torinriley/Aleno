@@ -36,6 +36,8 @@ struct Settings: Equatable {
     }
     struct Workspace: Equatable {
         var confirmOnClose = false
+        /// When to play the welcome animation: "first-launch", "always" or "never".
+        var welcome = "first-launch"
     }
 
     var font = Font()
@@ -139,10 +141,11 @@ struct Settings: Equatable {
                 default: break
                 }
             }
-            case "workspace": v.object(val, path: "workspace", known: ["restoreSessions", "confirmOnClose"]) { k, x in
+            case "workspace": v.object(val, path: "workspace", known: ["restoreSessions", "confirmOnClose", "welcome"]) { k, x in
                 switch k {
                 case "restoreSessions": break // Accept legacy settings without restoring sessions.
                 case "confirmOnClose": if let b = v.bool(x, "workspace.confirmOnClose") { s.workspace.confirmOnClose = b }
+                case "welcome": if let t = v.enumString(x, "workspace.welcome", ["first-launch", "always", "never"]) { s.workspace.welcome = t }
                 default: break
                 }
             }

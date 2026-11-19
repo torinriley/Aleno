@@ -65,6 +65,10 @@ At startup the daemon writes small scripts next to its socket and points the she
 
 The terminal engine turns those into command blocks, which drive the failure bars, notifications and output copying.
 
+## The welcome
+
+For the first-run welcome the daemon starts the pane's process as `aleno-daemon welcome -- <shell> <arg0> ...` instead of the shell. That small program draws the animation on the pane's terminal and then replaces itself with the shell using `exec`, so the shell ends up as the pane's process with the same environment and shell integration. The wordmark is a pre-rendered 384 by 120 coverage bitmap (`crates/aleno-daemon/src/welcome_logo.bin`) that is resampled to the window width and drawn as braille dots.
+
 ## Settings
 
 `~/.config/aleno/settings.json` is read at launch and watched for changes. It is validated key by key, and `schemas/settings.schema.json` describes the same options for editor autocomplete. An invalid file is rejected whole and the previous configuration stays in effect, with a message in the window. Defaults for every key and shortcut live in `app/Configuration/Settings.swift`.

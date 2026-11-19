@@ -60,7 +60,7 @@ char *aleno_ctl_get_layout(const AlenoCtl *c, uint32_t session);
 int64_t aleno_ctl_create_pane(const AlenoCtl *c, uint32_t session, uint16_t cols, uint16_t rows,
                               const char *shell, const char *cwd, uint32_t scrollback);
 int64_t aleno_ctl_create_pane_seeded(const AlenoCtl *c, uint32_t session, uint16_t cols, uint16_t rows,
-                                     const char *shell, const char *cwd, uint32_t scrollback, const char *seed);
+                                     const char *shell, const char *cwd, uint32_t scrollback, const char *seed, int32_t welcome);
 int32_t aleno_ctl_kill_pane(const AlenoCtl *c, uint32_t session, uint32_t pane);
 
 AlenoPane *aleno_pane_attach(const char *path, uint32_t session, uint32_t pane, uint16_t cols, uint16_t rows,

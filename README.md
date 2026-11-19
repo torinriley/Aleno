@@ -28,6 +28,7 @@ Aleno looks and behaves like a Mac app, because it is one. Real AppKit windows, 
 - **Tabs and splits done properly.** Drag a tab out to make a window. Reopen a closed tab with its history (`⌘⇧T`). Split any pane, as deep as you like.
 - **Beautiful by default.** Translucent windows with an adjustable blur or macOS Liquid Glass, programming ligatures, and a theme that follows the system.
 - **Text that behaves.** Lines re-wrap when you resize, `⌘`-click a folder to open it in Finder, drag a file in to paste its path, and Find searches the whole scrollback.
+- **A welcome worth opening.** The first launch draws the Aleno wordmark in dot-matrix lettering, then shows the shortcuts and where your settings live. Press any key to skip it.
 - **Part of macOS.** Right-click a folder in Finder for "New Aleno Window Here", or drop it on the Dock icon.
 - **Configured with one JSON file.** Live reload, a schema for autocomplete, and a bad file never breaks your terminal.
 

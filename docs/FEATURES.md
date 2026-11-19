@@ -1,5 +1,13 @@
 # Features
 
+## Welcome
+
+The first time Aleno runs, the logo materializes in dot-matrix lettering with a soft shadow, followed by a short introduction: the essential shortcuts, what command blocks and notifications do, and where the settings file lives. Then your shell starts as usual. Press any key to skip the animation.
+
+It runs as the first thing in the new pane, in front of your shell, so it adds nothing to your shell's startup and leaves nothing in your history. See it again any time with Help, Welcome to Aleno.
+
+`workspace.welcome` controls it: `"first-launch"` (the default), `"always"` or `"never"`. In narrow windows the logo is left out and the text is shortened.
+
 ## About
 
 Aleno, About Aleno shows the icon, the exact version and build number (read from the running app, so it is always right), a one-line description, and two quiet links: the website and the GitHub page. Esc closes it.
@@ -48,6 +56,7 @@ for i in 10 30 50 70 90; do printf '\e]9;4;1;%d\a' $i; sleep 0.7; done; printf '
 - Translucent windows with `appearance.opacity`, plus either an adjustable blur (`blurRadius`), the standard macOS frosted blur, or Liquid Glass (`blurStyle`: `"glass"`).
 - Block, bar or underline cursor with optional blinking. Programs can change it with DECSCUSR.
 - Light, dark or system theme, with optional color overrides and a custom 16-color palette.
+- Block elements (`▀ ▄ █ ▌ ▐ ░ ▒ ▓` and the quadrants) and braille patterns are drawn by the renderer itself, filling the whole cell with no gaps at any line height, so charts, progress bars and dot-matrix graphics from tools like `btop` and `bat` look solid.
 - A bundled Nerd Font symbols fallback, so icons in prompts such as Powerlevel10k render without extra setup.
 
 ## macOS integration

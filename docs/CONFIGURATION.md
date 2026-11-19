@@ -8,7 +8,7 @@ Aleno reads `~/.config/aleno/settings.json`. Press `⌘,` to open it. Changes ap
   "font": { "family": "SF Mono", "size": 13, "lineHeight": 1.2, "ligatures": true },
   "appearance": { "theme": "system", "opacity": 0.85, "blur": true, "blurRadius": 25, "padding": 12 },
   "terminal": { "shell": "default", "scrollback": 10000, "cursorStyle": "bar", "notifyAfterSeconds": 10 },
-  "workspace": { "confirmOnClose": false },
+  "workspace": { "confirmOnClose": false, "welcome": "first-launch" },
   "keybindings": { "newTab": "cmd+t", "splitRight": "cmd+d", "splitDown": "cmd+shift+d" }
 }
 ```
@@ -52,6 +52,7 @@ Aleno reads `~/.config/aleno/settings.json`. Press `⌘,` to open it. Changes ap
 | Key | Default | Description |
 |---|---|---|
 | `confirmOnClose` | `false` | Ask before closing a window. Quitting with open windows always asks. |
+| `welcome` | `first-launch` | When to play the welcome animation: `first-launch`, `always` or `never`. Help, Welcome to Aleno shows it on demand. |
 
 ## keybindings
 

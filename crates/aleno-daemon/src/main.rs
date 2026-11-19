@@ -1,12 +1,15 @@
 //! aleno-daemon: per-user background process that owns PTYs and terminal sessions.
 //!
 //! Commands:
+//!   welcome -- <shell> <arg0> [args]   first-run welcome in a pane, then exec the shell
 //!   run               run in the foreground (used by launchd and by `start`)
 //!   start             ensure a daemon is running; detach it into its own session if not
 //!   stop              ask the daemon to shut down (terminates all sessions)
 //!   status | list     print daemon / session information
 //!   install-launchd   install a LaunchAgent that starts the daemon at login
 //!   uninstall-launchd remove it
+
+mod welcome;
 
 use aleno_protocol::*;
 use aleno_session::Server;
@@ -259,6 +262,7 @@ fn main() {
     let code = match arg.as_str() {
         "run" => run(false),
         "run-app" => run(true),
+        "welcome" => welcome::run(&std::env::args().skip(2).collect::<Vec<_>>()),
         "start" => start(),
         "stop" => match connect() {
             Ok(mut s) => {
