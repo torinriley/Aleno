@@ -50,6 +50,8 @@ The tests cover the parser, reflow, command blocks and snapshots, the protocol, 
 | Text drawing | `app/Rendering` and `shaders/Terminal.metal` |
 | Settings and keybindings | `app/Configuration` and `schemas/settings.schema.json` |
 
+Versions live in two places that must agree: `CFBundleShortVersionString` in `project.yml` and the workspace version in `Cargo.toml`. Run `scripts/check-versions.sh` after changing either.
+
 When you add a setting, add it to `Settings.swift` (with validation), to `schemas/settings.schema.json`, and to [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Keep `aleno.h` in sync with `ffi.rs`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the parts fit together.

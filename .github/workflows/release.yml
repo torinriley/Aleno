@@ -28,6 +28,11 @@ jobs:
       NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the build number is the commit count
+
+      - name: Check versions agree
+        run: scripts/check-versions.sh
 
       - name: Toolchain
         run: |

@@ -149,6 +149,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         openDirectories(servicePaths(pboard), asTabs: true)
     }
 
+    @objc func showAbout() { AboutWindowController.shared.show() }
+
     @objc func newWindow() {
         if Bench.on { Bench.windowStart = CACurrentMediaTime() }
         guard let id = DaemonClient.shared.createSession(name: "") else { NSSound.beep(); return }
@@ -185,7 +187,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             let m = NSMenu(title: title); build(m); item.submenu = m
         }
         submenu("Aleno") { m in
-            m.addItem(withTitle: "About Aleno", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+            m.addItem(withTitle: "About Aleno", action: #selector(showAbout), keyEquivalent: "")
             m.addItem(.separator())
             add(m, "Settings…", "openSettings", #selector(openSettings))
             m.addItem(.separator())
