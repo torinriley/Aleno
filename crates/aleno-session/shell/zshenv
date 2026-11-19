@@ -1,0 +1,41 @@
+# Aleno shell integration (zsh). Loaded through ZDOTDIR; restores the user's real ZDOTDIR first.
+if [[ -n "${ALENO_ZDOTDIR+X}" ]]; then
+  ZDOTDIR="$ALENO_ZDOTDIR"
+  unset ALENO_ZDOTDIR
+else
+  unset ZDOTDIR
+fi
+[[ -f "${ZDOTDIR:-$HOME}/.zshenv" ]] && builtin source -- "${ZDOTDIR:-$HOME}/.zshenv"
+
+if [[ -o interactive && "${ALENO_SHELL_INTEGRATION:-1}" != 0 && -z "$_aleno_loaded" ]]; then
+  typeset -g _aleno_loaded=1 _aleno_ran=0
+
+  _aleno_pre() {
+    local ret=$?
+    if (( _aleno_ran )); then
+      builtin print -rn -- $'\e]133;D;'"$ret"$'\a'
+      _aleno_ran=0
+    fi
+    # Stay first/last in the hook lists so $? is intact and prompt themes have already run.
+    precmd_functions=(_aleno_pre ${precmd_functions:#_aleno_(pre|post)} _aleno_post)
+  }
+  _aleno_post() {
+    local p="$PWD" enc="" c i
+    for (( i = 1; i <= ${#p}; i++ )); do
+      c="${p[i]}"
+      case "$c" in
+        [a-zA-Z0-9/._~-]) enc+="$c" ;;
+        *) enc+="$(builtin printf '%%%02X' "'$c")" ;;
+      esac
+    done
+    builtin print -rn -- $'\e]7;file://'"${HOST}${enc}"$'\a\e]133;A\a'
+  }
+  _aleno_preexec() {
+    _aleno_ran=1
+    # The command line travels with the C mark (control characters flattened, capped) so Aleno can show and rerun it.
+    local _aleno_cmd="${1//[[:cntrl:]]/ }"
+    builtin print -rn -- $'\e]133;C;cmd='"${_aleno_cmd[1,512]}"$'\a'
+  }
+  precmd_functions=(_aleno_pre ${precmd_functions:#_aleno_(pre|post)} _aleno_post)
+  preexec_functions=(${preexec_functions:#_aleno_preexec} _aleno_preexec)
+fi

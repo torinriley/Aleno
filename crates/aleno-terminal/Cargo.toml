@@ -1,0 +1,10 @@
+[package]
+name = "aleno-terminal"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vte = { workspace = true }
+unicode-width = { workspace = true }
+
+[dev-dependencies]

@@ -1,0 +1,16 @@
+[package]
+name = "aleno-client"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+aleno-terminal = { path = "../aleno-terminal" }
+aleno-protocol = { path = "../aleno-protocol" }
+libc = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+aleno-session = { path = "../aleno-session" }

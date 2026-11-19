@@ -1,0 +1,14 @@
+[package]
+name = "aleno-daemon"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "aleno-daemon"
+path = "src/main.rs"
+
+[dependencies]
+aleno-terminal = { path = "../aleno-terminal" }
+aleno-protocol = { path = "../aleno-protocol" }
+aleno-session = { path = "../aleno-session" }
+libc = { workspace = true }

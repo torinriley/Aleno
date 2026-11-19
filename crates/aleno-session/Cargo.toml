@@ -1,0 +1,10 @@
+[package]
+name = "aleno-session"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aleno-terminal = { path = "../aleno-terminal" }
+aleno-protocol = { path = "../aleno-protocol" }
+libc = { workspace = true }
+serde_json = { workspace = true }
