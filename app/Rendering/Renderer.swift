@@ -208,7 +208,11 @@ final class PaneRenderer {
             if f & 32 != 0 { swap(&fg, &bg); bgIsDefault = false }
             let a: Float = bgIsDefault ? defaultBgA : 1
             // On the default background, keep text legible: more strictly when the window is see-through.
-            if bgIsDefault { fg = theme.ensureContrast(fg, ratio: seeThrough ? 4.5 : 3.0) }
+            // Only real text: powerline tips and icons (private use), box drawing, blocks, shapes and braille are
+            // drawn in the exact colour the prompt asked for (a segment's dark background colour, for instance).
+            let chv = cell.ch
+            let isArt = (0xE000...0xF8FF).contains(chv) || (0x2500...0x25FF).contains(chv) || (0x2800...0x28FF).contains(chv)
+            if bgIsDefault && !isArt { fg = theme.ensureContrast(fg, ratio: seeThrough ? 4.5 : 3.0) }
             i.fg = RGBA(fg).packed
             i.bg = RGBA(bg, a: a).packed
             var flags: UInt16 = 0
