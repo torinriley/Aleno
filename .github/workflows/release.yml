@@ -1,0 +1,109 @@
+name: Release
+
+# Push a tag like v0.1.0 to build, sign, notarize and publish a release.
+# Without the signing secrets (see docs/RELEASING.md) the workflow still builds and uploads an unsigned
+# package as a workflow artifact, but it never publishes a release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+      CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+      SIGN_IDENTITY: ${{ secrets.APPLE_SIGN_IDENTITY }}
+      NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+      NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+      NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          brew install xcodegen
+          xcodebuild -version
+
+      - name: Decide whether this run can sign
+        id: mode
+        run: |
+          if [ -n "$CERT_P12_BASE64" ] && [ -n "$CERT_PASSWORD" ] && [ -n "$SIGN_IDENTITY" ] \
+             && [ -n "$NOTARY_APPLE_ID" ] && [ -n "$NOTARY_PASSWORD" ] && [ -n "$NOTARY_TEAM_ID" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Signing secrets are not configured: building an unsigned package that will not be published."
+          fi
+
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(grep -E '^\s+CFBundleShortVersionString:' project.yml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match CFBundleShortVersionString ${version} in project.yml"
+            exit 1
+          fi
+
+      - name: Rust tests
+        run: |
+          cargo build --workspace
+          cargo test --workspace
+
+      - name: Import the signing certificate
+        if: steps.mode.outputs.signed == 'true'
+        run: |
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          keychain_password="$(uuidgen)"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security find-identity -v -p codesigning "$keychain"
+
+      - name: Build, sign and notarize
+        if: steps.mode.outputs.signed == 'true'
+        env:
+          ALENO_SIGN_IDENTITY: ${{ secrets.APPLE_SIGN_IDENTITY }}
+          ALENO_NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          ALENO_NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+          ALENO_NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+        run: scripts/release.sh
+
+      - name: Build (unsigned)
+        if: steps.mode.outputs.signed != 'true'
+        run: scripts/release.sh --unsigned
+
+      - name: Upload the package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aleno-${{ steps.mode.outputs.signed == 'true' && 'notarized' || 'unsigned' }}
+          path: |
+            dist/Aleno.dmg
+            dist/Aleno-*.zip
+            dist/SHA256SUMS
+          if-no-files-found: error
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v') && steps.mode.outputs.signed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "Aleno ${tag#v}" --generate-notes
+          gh release upload "$tag" dist/Aleno.dmg dist/Aleno-*.zip dist/SHA256SUMS --clobber

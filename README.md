@@ -13,6 +13,7 @@
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-black">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-arm64-black">
   <img alt="Rust and Swift" src="https://img.shields.io/badge/Rust%20%2B%20Swift-black">
+  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-black">
 </p>
 
 ---
@@ -88,3 +89,7 @@ schemas/      JSON schema for settings.json
 scripts/      Project generation, release and build helpers
 tests/        Benchmarks and integration scripts
 ```
+
+## License
+
+[MIT](LICENSE). The bundled terminal parser is a lightly patched copy of [vte](https://github.com/alacritty/vte) (MIT or Apache-2.0), and the bundled Symbols Nerd Font is under its own license (`app/Resources/Fonts/LICENSE-SymbolsNerdFont.txt`).

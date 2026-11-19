@@ -32,10 +32,35 @@ The script:
 4. Builds a disk image with an Applications shortcut, signs it, notarizes it and staples it.
 5. Checks both with `spctl`, which must report `Notarized Developer ID`.
 
-Then publish `dist/Aleno.dmg` on the GitHub releases page:
+The script produces, in `dist/`:
+
+- `Aleno.dmg`, the notarized disk image
+- `Aleno-<version>-arm64.zip`, the notarized app bundle
+- `SHA256SUMS`, checksums for both
+
+`scripts/release.sh --unsigned` builds the same package with an ad-hoc signature and no notarization. That is what CI uses when it has no secrets.
+
+Bump `CFBundleShortVersionString` in `project.yml` before a release, then publish by hand with:
 
 ```bash
-gh release create v0.1.0 dist/Aleno.dmg --title "Aleno 0.1.0" --notes "..."
+gh release create v0.1.0 dist/Aleno.dmg dist/Aleno-0.1.0-arm64.zip dist/SHA256SUMS --title "Aleno 0.1.0" --generate-notes
 ```
 
-Bump `CFBundleShortVersionString` in `project.yml` first.
+## Releasing from GitHub Actions
+
+`.github/workflows/ci.yml` builds and tests every push and pull request.
+
+`.github/workflows/release.yml` runs when you push a tag such as `v0.1.0` (or when started by hand). It runs the tests, builds, signs, notarizes and publishes the release with the same script. The tag must match `CFBundleShortVersionString` in `project.yml`.
+
+For signing it needs these repository secrets (Settings, Secrets and variables, Actions):
+
+| Secret | What it is |
+|---|---|
+| `APPLE_CERT_P12_BASE64` | Your Developer ID Application certificate and its private key, exported from Keychain Access as a `.p12` and encoded with `base64 -i cert.p12` |
+| `APPLE_CERT_PASSWORD` | The password you set when exporting the `.p12` |
+| `APPLE_SIGN_IDENTITY` | The identity name, for example `Developer ID Application: Your Name (TEAMID)` |
+| `NOTARY_APPLE_ID` | The Apple ID used for notarization |
+| `NOTARY_PASSWORD` | An app-specific password for that Apple ID |
+| `NOTARY_TEAM_ID` | Your Apple developer team ID |
+
+Without these the workflow still builds and uploads an unsigned package as a workflow artifact, and never publishes a release.

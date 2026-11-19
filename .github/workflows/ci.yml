@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          brew install xcodegen
+          xcodebuild -version
+          rustc --version
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: rust-${{ runner.os }}-
+
+      - name: Rust tests
+        run: |
+          cargo build --workspace
+          cargo test --workspace
+
+      - name: Build the app
+        run: |
+          scripts/generate-project.sh
+          xcodebuild -project Aleno.xcodeproj -scheme Aleno -configuration Release -derivedDataPath build build | tail -5
+          test -x build/Build/Products/Release/Aleno.app/Contents/MacOS/Aleno
+          test -x build/Build/Products/Release/Aleno.app/Contents/MacOS/aleno-daemon
