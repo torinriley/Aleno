@@ -54,7 +54,7 @@ if [ "$UNSIGNED" = 1 ]; then
   codesign --force --sign - "$APP/Contents/MacOS/aleno-daemon"
   codesign --force --sign - "$APP"
   make_dmg
-  ditto -c -k --keepParent "$APP" "$ZIP"
+  ditto -c -k --keepParent --norsrc --noextattr "$APP" "$ZIP"
 else
   echo "==> sign with: $ALENO_SIGN_IDENTITY"
   # Inside-out: nested executables first, then the bundle.
@@ -72,7 +72,7 @@ else
   xcrun notarytool submit "$OUT/notarize.zip" "${NOTARY[@]}" --wait
   xcrun stapler staple "$APP"
   rm -f "$OUT/notarize.zip"
-  ditto -c -k --keepParent "$APP" "$ZIP"      # the zip carries the stapled app
+  ditto -c -k --keepParent --norsrc --noextattr "$APP" "$ZIP"      # the zip carries the stapled app
 
   echo "==> package and notarize the dmg"
   make_dmg
