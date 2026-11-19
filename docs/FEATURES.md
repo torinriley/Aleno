@@ -1,5 +1,9 @@
 # Features
 
+## About
+
+Aleno, About Aleno shows the icon, the exact version and build number (read from the running app, so it is always right), a one-line description, and two quiet links: the website and the GitHub page. Esc closes it.
+
 ## Command blocks
 
 Aleno's shells report where each prompt starts, when a command begins and ends, its exit status, and the working directory (the OSC 133 and OSC 7 sequences). Aleno turns that into:

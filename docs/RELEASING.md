@@ -40,7 +40,9 @@ The script produces, in `dist/`:
 
 `scripts/release.sh --unsigned` builds the same package with an ad-hoc signature and no notarization. That is what CI uses when it has no secrets.
 
-Bump `CFBundleShortVersionString` in `project.yml` before a release, then publish by hand with:
+Versions: the app version is `CFBundleShortVersionString` in `project.yml`, and the Rust crates share the version in the `[workspace.package]` table of `Cargo.toml`. `scripts/check-versions.sh` (run by CI) fails when they differ. The build number shown in the About window, as in `Version 0.1.0 (24)`, is the number of commits and is set automatically on every build.
+
+Bump both versions before a release, then publish by hand with:
 
 ```bash
 gh release create v0.1.0 dist/Aleno.dmg dist/Aleno-0.1.0-arm64.zip dist/SHA256SUMS --title "Aleno 0.1.0" --generate-notes
