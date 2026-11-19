@@ -54,6 +54,33 @@ When you add a setting, add it to `Settings.swift` (with validation), to `schema
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the parts fit together.
 
+## Branches and commits
+
+`main` is protected: it cannot be deleted or force-pushed, and all changes arrive through pull requests. Never commit to it directly.
+
+Make each change on its own branch, cut from an up-to-date `main`, named `<type>/<short-description>` in lowercase with hyphens:
+
+| Prefix | For |
+|---|---|
+| `feat/` | A new feature or behavior, for example `feat/quick-terminal` |
+| `fix/` | A bug fix, for example `fix/find-bar-overlap` |
+| `docs/` | Documentation only |
+| `perf/` | A performance improvement |
+| `refactor/` | A change that does not alter behavior |
+| `test/` | Tests only |
+| `chore/` | Build, tooling, CI and dependency updates |
+
+Write commit messages as `<type>: <summary>`, using the same types without the slash. Keep the summary in the imperative mood and under about 70 characters, and add a body when the why is not obvious:
+
+```
+fix: keep the find bar below the tab strip
+
+The bar was anchored to the top of the view, so it overlapped the tabs
+in multi-tab windows.
+```
+
+Keep a branch to one change, rebase it on `main` before opening the pull request, and give the pull request the same `<type>: <summary>` title as its main commit.
+
 ## Pull requests
 
 - One change per pull request, with a short description of what and why.
