@@ -36,6 +36,8 @@ struct Settings: Equatable {
     }
     struct Workspace: Equatable {
         var confirmOnClose = false
+        /// Ask before quitting Aleno while windows are open.
+        var confirmOnQuit = true
         /// When to play the welcome animation: "first-launch", "always" or "never".
         var welcome = "first-launch"
     }
@@ -141,10 +143,11 @@ struct Settings: Equatable {
                 default: break
                 }
             }
-            case "workspace": v.object(val, path: "workspace", known: ["restoreSessions", "confirmOnClose", "welcome"]) { k, x in
+            case "workspace": v.object(val, path: "workspace", known: ["restoreSessions", "confirmOnClose", "confirmOnQuit", "welcome"]) { k, x in
                 switch k {
                 case "restoreSessions": break // Accept legacy settings without restoring sessions.
                 case "confirmOnClose": if let b = v.bool(x, "workspace.confirmOnClose") { s.workspace.confirmOnClose = b }
+                case "confirmOnQuit": if let b = v.bool(x, "workspace.confirmOnQuit") { s.workspace.confirmOnQuit = b }
                 case "welcome": if let t = v.enumString(x, "workspace.welcome", ["first-launch", "always", "never"]) { s.workspace.welcome = t }
                 default: break
                 }

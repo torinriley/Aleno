@@ -183,6 +183,7 @@ final class PaneRenderer {
     private func buildRow(_ r: Int, into inst: UnsafeMutablePointer<CellInstance>, pane: OpaquePointer) {
         let base = r * cols
         let absRow = line(forRow: r)
+        let seeThrough = ConfigStore.shared.settings.appearance.opacity < 1
         let defaultBgA: Float = 0   // the window's tint layer provides the default background
         // Top/bottom edge rows only extend into the padding when the whole row is a single background
         // colour (a full-screen app); a shell prompt with coloured segments must not smear upward.
@@ -206,6 +207,8 @@ final class PaneRenderer {
             var bgIsDefault = (cell.bg & 0xFF00_0000) == 0
             if f & 32 != 0 { swap(&fg, &bg); bgIsDefault = false }
             let a: Float = bgIsDefault ? defaultBgA : 1
+            // On the default background, keep text legible: more strictly when the window is see-through.
+            if bgIsDefault { fg = theme.ensureContrast(fg, ratio: seeThrough ? 4.5 : 3.0) }
             i.fg = RGBA(fg).packed
             i.bg = RGBA(bg, a: a).packed
             var flags: UInt16 = 0

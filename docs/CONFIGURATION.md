@@ -51,7 +51,8 @@ Aleno reads `~/.config/aleno/settings.json`. Press `⌘,` to open it. Changes ap
 
 | Key | Default | Description |
 |---|---|---|
-| `confirmOnClose` | `false` | Ask before closing a window. Quitting with open windows always asks. |
+| `confirmOnClose` | `false` | Ask before closing a window. |
+| `confirmOnQuit` | `true` | Ask before quitting Aleno while windows are open. Set `false` to quit immediately. |
 | `welcome` | `first-launch` | When to play the welcome animation: `first-launch`, `always` or `never`. Help, Welcome to Aleno shows it on demand. |
 
 ## keybindings

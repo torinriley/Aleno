@@ -39,6 +39,32 @@ struct Theme {
             palette: pal)
     }
 
+    /// Relative luminance (WCAG) of a 0xRRGGBB color.
+    private static func luminance(_ c: UInt32) -> Double {
+        func lin(_ v: UInt32) -> Double { let s = Double(v) / 255; return s <= 0.03928 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4) }
+        return 0.2126 * lin((c >> 16) & 0xFF) + 0.7152 * lin((c >> 8) & 0xFF) + 0.0722 * lin(c & 0xFF)
+    }
+
+    /// Nudge `fg` toward white (dark backgrounds) or black (light ones) until it reaches `ratio` contrast against
+    /// the theme background. Keeps faint text such as shell autosuggestions (bright black) readable on a blurred,
+    /// see-through window, where the real backdrop is lighter than the configured background.
+    func ensureContrast(_ fg: UInt32, ratio: Double) -> UInt32 {
+        let bl = Theme.luminance(background)
+        func cr(_ c: UInt32) -> Double { let l = Theme.luminance(c); return (max(l, bl) + 0.05) / (min(l, bl) + 0.05) }
+        if cr(fg) >= ratio { return fg }
+        let target: UInt32 = bl < 0.5 ? 0xFFFFFF : 0x000000
+        var lo = 0.0, hi = 1.0
+        func mix(_ t: Double) -> UInt32 {
+            func ch(_ s: Int) -> UInt32 {
+                let a = Double((fg >> UInt32(s)) & 0xFF), b = Double((target >> UInt32(s)) & 0xFF)
+                return UInt32((a + (b - a) * t).rounded())
+            }
+            return (ch(16) << 16) | (ch(8) << 8) | ch(0)
+        }
+        for _ in 0..<8 { let m = (lo + hi) / 2; if cr(mix(m)) >= ratio { hi = m } else { lo = m } }
+        return mix(hi)
+    }
+
     /// Resolve an `AlenoCell` color value (see aleno.h) against this theme.
     @inline(__always) func resolve(_ v: UInt32, isFg: Bool) -> UInt32 {
         switch v & 0xFF00_0000 {

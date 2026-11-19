@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if !controllers.isEmpty {
+        if !controllers.isEmpty, ConfigStore.shared.settings.workspace.confirmOnQuit {
             let alert = NSAlert()
             alert.messageText = "Are you sure you want to quit Aleno?"
             alert.informativeText = "Quitting closes all terminal windows and ends the shells and commands running in them."
