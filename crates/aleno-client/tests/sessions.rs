@@ -583,11 +583,12 @@ fn progress_from_the_shell_reaches_the_client_and_raises_an_event() {
         }
     }))
     .unwrap();
-    c.send_input(b"printf '\\033]9;4;1;40\\a'; echo done-1\n");
+    c.send_input(b"printf '\\033]9;4;1;40\\a'; echo done-$((1+0))\n");
+    // The marker is computed by the shell, so it only appears once the command has run (not in the tty's echo of the input).
     wait_for(&c, "progress output", |t| t.contains("done-1"));
     assert_eq!(c.shared.term.lock().unwrap().progress(), (1, 40));
     assert!(events.load(std::sync::atomic::Ordering::SeqCst) >= 1, "EVENT_PROGRESS delivered");
-    c.send_input(b"printf '\\033]9;4;0\\a'; echo done-2\n");
+    c.send_input(b"printf '\\033]9;4;0\\a'; echo done-$((1+1))\n");
     wait_for(&c, "cleared", |t| t.contains("done-2"));
     assert_eq!(c.shared.term.lock().unwrap().progress(), (0, 0));
 }
