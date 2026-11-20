@@ -299,7 +299,22 @@ final class TabBarView: NSView {
             let rightPad: CGFloat = 40
             let textRect = NSRect(x: r.minX + 40, y: r.midY - 9, width: max(0, r.width - 40 - rightPad), height: 18)
             let centered = NSMutableParagraphStyle(); centered.lineBreakMode = .byTruncatingTail; centered.alignment = .center
-            drawFading(key: i, text: t, rect: textRect, font: NSFont.systemFont(ofSize: 13), color: color, style: centered)
+            if animStart > 0, layoutProgress < 1 {
+                // While tabs slide to their new widths, lay the title out once at the width it will end up with (so the
+                // truncation point does not creep from one character to the next every frame), keep it centred on the
+                // moving tab, snap it to whole pixels, and clip it to the tab as it is now.
+                let to = targetFraction(i)
+                let laidW = max(0, to.w * stripRect.width - 4 - 40 - rightPad)
+                let scale = window?.backingScaleFactor ?? 2
+                let x = ((textRect.midX - laidW / 2) * scale).rounded() / scale
+                let laid = NSRect(x: x, y: textRect.minY, width: laidW, height: textRect.height)
+                NSGraphicsContext.saveGraphicsState()
+                NSBezierPath(rect: textRect).addClip()
+                drawFading(key: i, text: t, rect: laid, font: NSFont.systemFont(ofSize: 13), color: color, style: centered)
+                NSGraphicsContext.restoreGraphicsState()
+            } else {
+                drawFading(key: i, text: t, rect: textRect, font: NSFont.systemFont(ofSize: 13), color: color, style: centered)
+            }
             if i < progress.count { drawProgress(progress[i], in: NSRect(x: r.minX + 18, y: r.maxY - 6, width: max(0, r.width - 36), height: 2.5)) }
             if showClose {
                 let c = closeRect(i)
