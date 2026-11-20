@@ -1103,10 +1103,10 @@ impl Screen {
             let cols = g.cols;
             g.lines[idx] = Line::blank(cols, Cell::BLANK);
         }
-        self.crow = row;
-        self.ccol = 0;
+        // The cursor stays on its row. The shell repaints from where it believes the cursor is (zsh and Powerlevel10k
+        // go up by the prompt's height from the input line, then clear below), so moving the cursor to the prompt's
+        // first line would put every repaint one row too high. The block stays too: a redraw sends no new prompt mark.
         self.pending_wrap = false;
-        self.blocks.pop_back();
         for d in self.dirty.iter_mut() {
             *d = true;
         }

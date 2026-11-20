@@ -505,10 +505,43 @@ fn reflow_moves_command_blocks_with_their_lines() {
     for w in [10, 25, 90, 30] {
         t.resize(w, 8);
         let b = t.blocks();
-        // The live prompt is wiped on resize (the shell repaints it), so only finished blocks remain.
-        assert_eq!(b.len(), 2, "width {}", w);
+        // The live prompt is wiped on resize (the shell repaints it) but its block stays for the repaint to fill.
+        assert_eq!(b.len(), 3, "width {}", w);
         assert_eq!(text(&t, &b[0]), want, "width {}", w);
         assert_eq!(b[1].exit, 1);
+    }
+}
+
+/// What zsh + Powerlevel10k send on SIGWINCH with a two-line prompt: the cursor is on the input line, so they go up
+/// one row, clear below and repaint both lines. The terminal must leave the cursor where the shell expects it.
+fn p10k_prompt(t: &mut Terminal, width: usize) {
+    let gap = " ".repeat(width - 17); // "> PROMPT-TOP" + gap + "right" fills the row exactly
+    t.feed(format!("\x1b[0m\x1b[?2004l\r\n\x1b[A> PROMPT-TOP{gap}right\r\n\\_ ").as_bytes());
+}
+
+#[test]
+fn shell_repaint_after_resize_does_not_leave_stray_prompts() {
+    let mut t = Terminal::new(60, 12, 200);
+    t.feed(b"out-1\r\nout-2\r\nout-3\r\n");
+    t.feed(b"\x1b]133;A\x07");
+    p10k_prompt(&mut t, 60);
+    let mut seed = 7u64;
+    for _ in 0..40 {
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let w = 30 + ((seed >> 33) % 70) as usize;
+        t.resize(w, 12);
+        // The shell notices SIGWINCH and repaints from the input line.
+        t.feed(b"\r\r\x1b[A\x1b[0m\x1b[J");
+        p10k_prompt(&mut t, w);
+    }
+    t.resize(60, 12);
+    t.feed(b"\r\r\x1b[A\x1b[0m\x1b[J");
+    p10k_prompt(&mut t, 60);
+    let screen = t.screen_text();
+    assert_eq!(screen.matches("PROMPT-TOP").count(), 1, "stray prompts:\n{}", screen);
+    assert_eq!(screen.matches("\\_").count(), 1, "stray prompts:\n{}", screen);
+    for l in ["out-1", "out-2", "out-3"] {
+        assert!(screen.contains(l), "{} was eaten:\n{}", l, screen);
     }
 }
 
