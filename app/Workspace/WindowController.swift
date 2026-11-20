@@ -135,7 +135,15 @@ final class WindowController: NSObject, NSWindowDelegate, TerminalViewDelegate, 
         workspace.autoresizingMask = [.width, .height]
     }
 
-    func windowDidResize(_ notification: Notification) { layoutChrome() }
+    private var lastWindowSize = NSSize.zero
+    private var windowResizedAt: CFTimeInterval = 0
+
+    func windowDidResize(_ notification: Notification) {
+        let size = window.frame.size
+        if size != lastWindowSize { windowResizedAt = CACurrentMediaTime() }
+        lastWindowSize = size
+        layoutChrome()
+    }
 
     @objc private func refreshBackdrop() {
         applyChrome()
@@ -529,6 +537,10 @@ final class WindowController: NSObject, NSWindowDelegate, TerminalViewDelegate, 
 
     func terminalView(_ v: TerminalView, resizedToCols cols: Int, rows: Int) {
         guard window.isVisible, tabs[safe: activeIndex]?.leaves.contains(where: { $0.view === v }) == true else { return }
+        // Only while the user is resizing (dragging the window edge, zooming, or dragging a split divider). Closing a tab,
+        // splitting, or showing/hiding the tab bar also changes the grid, but that is not a resize.
+        let windowResizing = window.inLiveResize || CACurrentMediaTime() - windowResizedAt < 0.4
+        guard windowResizing || DividerView.isDragging else { return }
         sizeBadge.show("\(cols) × \(rows)", over: v.convert(v.bounds, to: root))
     }
 
