@@ -50,6 +50,8 @@ final class DividerView: NSView {
     weak var node: SplitNode?
     var onChange: (() -> Void)?
     private var tracking = false
+    /// True while a divider is being dragged; the size badge only appears for resizes the user is making.
+    static private(set) var isDragging = false
 
     override func draw(_ dirtyRect: NSRect) {
         NSColor.separatorColor.setFill()
@@ -60,8 +62,8 @@ final class DividerView: NSView {
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: (node?.sideBySide ?? true) ? .resizeLeftRight : .resizeUpDown)
     }
-    override func mouseDown(with event: NSEvent) { tracking = true }
-    override func mouseUp(with event: NSEvent) { tracking = false }
+    override func mouseDown(with event: NSEvent) { tracking = true; DividerView.isDragging = true }
+    override func mouseUp(with event: NSEvent) { tracking = false; DividerView.isDragging = false }
     override func mouseDragged(with event: NSEvent) {
         guard tracking, let n = node, let sv = superview else { return }
         let p = sv.convert(event.locationInWindow, from: nil)
