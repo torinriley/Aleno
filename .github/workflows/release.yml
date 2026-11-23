@@ -88,7 +88,14 @@ jobs:
           ALENO_NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
           ALENO_NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
           ALENO_NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
-        run: scripts/release.sh
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          # The Sparkle key lives only in this step's temp file.
+          [ -n "$SPARKLE_PRIVATE_KEY" ] || { echo "::error::SPARKLE_PRIVATE_KEY is not set (see docs/RELEASING.md)"; exit 1; }
+          export ALENO_SPARKLE_KEY_FILE="$RUNNER_TEMP/sparkle_key"
+          ( umask 077; printf '%s' "$SPARKLE_PRIVATE_KEY" > "$ALENO_SPARKLE_KEY_FILE" )
+          trap 'rm -f "$ALENO_SPARKLE_KEY_FILE"' EXIT
+          scripts/release.sh
 
       - name: Build (unsigned)
         if: steps.mode.outputs.signed != 'true'
@@ -101,6 +108,7 @@ jobs:
           path: |
             dist/Aleno.dmg
             dist/Aleno-*.zip
+            dist/appcast.xml
             dist/SHA256SUMS
           if-no-files-found: error
 
@@ -111,4 +119,4 @@ jobs:
         run: |
           tag="$GITHUB_REF_NAME"
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "Aleno ${tag#v}" --generate-notes
-          gh release upload "$tag" dist/Aleno.dmg dist/Aleno-*.zip dist/SHA256SUMS --clobber
+          gh release upload "$tag" dist/Aleno.dmg dist/Aleno-*.zip dist/appcast.xml dist/SHA256SUMS --clobber
