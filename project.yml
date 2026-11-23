@@ -42,7 +42,7 @@ targets:
       properties:
         CFBundleName: Aleno
         CFBundleDisplayName: Aleno
-        CFBundleShortVersionString: "0.1.3"
+        CFBundleShortVersionString: "0.1.4"
         CFBundleVersion: "1"
         LSMinimumSystemVersion: "15.0"
         NSHighResolutionCapable: true
