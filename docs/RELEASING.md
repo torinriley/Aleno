@@ -73,7 +73,7 @@ Without these the workflow still builds and uploads an unsigned package as a wor
 
 ## Automatic updates
 
-Aleno updates itself with [Sparkle](https://sparkle-project.org). It checks a feed in the background, downloads a new version when there is one, and installs it when you quit, so a running shell is never interrupted. **Aleno menu, Check for Updates…** checks on demand.
+Aleno updates itself with [Sparkle](https://sparkle-project.org). It checks a feed every time it launches, and hourly while it stays open. When there is a new version, Sparkle asks whether to install it, then downloads it, verifies it and relaunches into it. **Aleno menu, Check for Updates…** checks on demand.
 
 How it fits together:
 

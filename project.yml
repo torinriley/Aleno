@@ -52,7 +52,8 @@ targets:
         SUFeedURL: https://github.com/torinriley/Aleno/releases/latest/download/appcast.xml
         SUPublicEDKey: "f2rjBhPysEY4iVueLusISw9MQNzee4zRtuoSqH0+ZJQ="
         SUEnableAutomaticChecks: true
-        SUAutomaticallyUpdate: true
+        SUAutomaticallyUpdate: false     # ask first: Sparkle shows its update prompt instead of installing silently
+        SUScheduledCheckInterval: 3600   # while Aleno stays open, check hourly (Sparkle's minimum); Updater.swift also checks at launch
         LSApplicationCategoryType: public.app-category.developer-tools
         CFBundleDocumentTypes:
           - CFBundleTypeName: Folder

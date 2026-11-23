@@ -89,12 +89,14 @@
 		</dict>
 	</array>
 	<key>SUAutomaticallyUpdate</key>
-	<true/>
+	<false/>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
 	<string>https://github.com/torinriley/Aleno/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>f2rjBhPysEY4iVueLusISw9MQNzee4zRtuoSqH0+ZJQ=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>3600</integer>
 </dict>
 </plist>
