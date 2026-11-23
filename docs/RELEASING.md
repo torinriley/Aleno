@@ -18,6 +18,8 @@
    ALENO_NOTARY_PROFILE="aleno-notary"
    ```
 
+4. Create the Sparkle update-signing key (see "Automatic updates" below).
+
 ## Make a release
 
 ```bash
@@ -36,6 +38,7 @@ The script produces, in `dist/`:
 
 - `Aleno.dmg`, the notarized disk image
 - `Aleno-<version>-arm64.zip`, the notarized app bundle
+- `appcast.xml`, the signed Sparkle update feed for this version
 - `SHA256SUMS`, checksums for both
 
 `scripts/release.sh --unsigned` builds the same package with an ad-hoc signature and no notarization. That is what CI uses when it has no secrets.
@@ -45,7 +48,7 @@ Versions: the app version is `CFBundleShortVersionString` in `project.yml`, and 
 Bump both versions before a release, then publish by hand with:
 
 ```bash
-gh release create v0.1.0 dist/Aleno.dmg dist/Aleno-0.1.0-arm64.zip dist/SHA256SUMS --title "Aleno 0.1.0" --generate-notes
+gh release create v0.1.0 dist/Aleno.dmg dist/Aleno-0.1.0-arm64.zip dist/appcast.xml dist/SHA256SUMS --title "Aleno 0.1.0" --generate-notes
 ```
 
 ## Releasing from GitHub Actions
@@ -64,5 +67,37 @@ For signing it needs these repository secrets (Settings, Secrets and variables, 
 | `NOTARY_APPLE_ID` | The Apple ID used for notarization |
 | `NOTARY_PASSWORD` | An app-specific password for that Apple ID |
 | `NOTARY_TEAM_ID` | Your Apple developer team ID |
+| `SPARKLE_PRIVATE_KEY` | The Sparkle EdDSA private key, exported with `generate_keys -x` (see below) |
 
 Without these the workflow still builds and uploads an unsigned package as a workflow artifact, and never publishes a release.
+
+## Automatic updates
+
+Aleno updates itself with [Sparkle](https://sparkle-project.org). It checks a feed in the background, downloads a new version when there is one, and installs it when you quit, so a running shell is never interrupted. **Aleno menu, Check for Updates…** checks on demand.
+
+How it fits together:
+
+- `Info.plist` (generated from `project.yml`) points `SUFeedURL` at `https://github.com/torinriley/Aleno/releases/latest/download/appcast.xml`. GitHub redirects that to the `appcast.xml` attached to the newest release, so there is no separate feed to host.
+- `scripts/release.sh` builds `appcast.xml` for the release with Sparkle's `generate_appcast` and signs it, and the zip's entry, with the EdDSA key. The app refuses any update that does not verify against `SUPublicEDKey`, on top of the usual Developer ID and notarization checks.
+- Sparkle compares `CFBundleVersion`, which the build sets to the commit count, so every release is newer than the last automatically.
+- Debug builds, and builds with an empty `SUPublicEDKey`, do not start the updater and hide the menu item.
+
+### One-time setup
+
+1. Resolve the package once so Sparkle's tools exist, by building (`scripts/generate-project.sh`, then an `xcodebuild`), then generate the key pair. The private key goes into your login keychain:
+
+   ```bash
+   build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys
+   ```
+
+   It prints the public key.
+2. Put the public key in `project.yml` as `SUPublicEDKey`.
+3. Export the private key and store it as the `SPARKLE_PRIVATE_KEY` repository secret:
+
+   ```bash
+   build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys -x sparkle_private_key
+   ```
+
+   Then delete the exported file. Keep a backup somewhere safe: if the key is lost, installed copies of Aleno can never verify another update, and users have to reinstall by hand.
+
+The first release that contains the updater has to be installed manually; from then on, installs update themselves.

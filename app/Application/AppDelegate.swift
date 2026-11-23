@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         started = Date()
         Bench.mark("didFinishLaunching")
         ConfigStore.shared.start()
+        Updater.shared.start()
         CommandNotifier.shared.install()
         CommandNotifier.shared.onActivate = { [weak self] s, p in self?.revealPane(session: s, pane: p) }
         Bench.mark("config loaded")
@@ -225,6 +226,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         submenu("Aleno") { m in
             m.addItem(withTitle: "About Aleno", action: #selector(showAbout), keyEquivalent: "")
+            if let updates = Updater.shared.makeMenuItem() { m.addItem(updates) }
             m.addItem(.separator())
             add(m, "Settings…", "openSettings", #selector(openSettings))
             m.addItem(.separator())

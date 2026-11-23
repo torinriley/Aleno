@@ -2,6 +2,7 @@
 # Build Aleno in Release and package it into dist/:
 #   Aleno.dmg            disk image with an Applications shortcut
 #   Aleno-<version>-arm64.zip   the app bundle
+#   appcast.xml          the Sparkle update feed for this release (signed builds only, needs the Sparkle key)
 #   SHA256SUMS           checksums for both
 #
 # Default: sign with a Developer ID certificate (hardened runtime), notarize with Apple and staple the tickets.
@@ -11,6 +12,8 @@
 #   ALENO_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 #   ALENO_NOTARY_PROFILE="aleno-notary"          # a `notarytool store-credentials` profile, or instead:
 #   ALENO_NOTARY_APPLE_ID, ALENO_NOTARY_PASSWORD (app-specific password), ALENO_NOTARY_TEAM_ID
+# The appcast is signed with the Sparkle EdDSA private key, taken from ALENO_SPARKLE_KEY_FILE (a file holding the exported
+# key, as CI provides it) or else from the login keychain, where Sparkle's generate_keys put it.
 # See docs/RELEASING.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -57,8 +60,16 @@ if [ "$UNSIGNED" = 1 ]; then
   ditto -c -k --keepParent --norsrc --noextattr "$APP" "$ZIP"
 else
   echo "==> sign with: $ALENO_SIGN_IDENTITY"
-  # Inside-out: nested executables first, then the bundle.
-  find "$APP/Contents" -type f \( -perm -111 -o -name '*.dylib' \) ! -path "$APP/Contents/MacOS/Aleno" -print0 |
+  # Inside-out: nested code first, then the bundle. Sparkle's helpers are signed in the order Sparkle documents,
+  # innermost first: XPC services, Updater.app, Autoupdate, then the framework itself.
+  SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+  if [ -d "$SPARKLE" ]; then
+    B="$SPARKLE/Versions/B"
+    for x in "$B"/XPCServices/*.xpc "$B/Updater.app" "$B/Autoupdate" "$SPARKLE"; do
+      [ -e "$x" ] && codesign --force --timestamp --options runtime --preserve-metadata=entitlements --sign "$ALENO_SIGN_IDENTITY" "$x"
+    done
+  fi
+  find "$APP/Contents" -type f \( -perm -111 -o -name '*.dylib' \) ! -path "$APP/Contents/MacOS/Aleno" ! -path "*/Sparkle.framework/*" -print0 |
     while IFS= read -r -d '' f; do
       if file "$f" | grep -q "Mach-O"; then
         codesign --force --timestamp --options runtime --sign "$ALENO_SIGN_IDENTITY" "$f"
@@ -84,6 +95,23 @@ else
   spctl -a -vv -t exec "$APP"
   spctl -a -vv -t open --context context:primary-signature "$DMG"
   xcrun stapler validate "$APP"
+fi
+
+if [ "$UNSIGNED" = 0 ]; then
+  echo "==> appcast"
+  # Sparkle's tools come with the package resolved by xcodebuild.
+  SPARKLE_BIN="build/SourcePackages/artifacts/sparkle/Sparkle/bin"
+  STAGE="$OUT/appcast-stage"; mkdir -p "$STAGE"
+  cp "$ZIP" "$STAGE/"
+  KEY_ARGS=()
+  [ -n "${ALENO_SPARKLE_KEY_FILE:-}" ] && KEY_ARGS=(--ed-key-file "$ALENO_SPARKLE_KEY_FILE")
+  "$SPARKLE_BIN/generate_appcast" ${KEY_ARGS[@]+"${KEY_ARGS[@]}"} \
+    --download-url-prefix "https://github.com/torinriley/Aleno/releases/download/v$VERSION/" \
+    --full-release-notes-url "https://github.com/torinriley/Aleno/releases/tag/v$VERSION" \
+    --link "https://github.com/torinriley/Aleno" \
+    -o "$OUT/appcast.xml" "$STAGE"
+  rm -rf "$STAGE"
+  grep -q "sparkle:edSignature" "$OUT/appcast.xml" || { echo "appcast is not signed: is the Sparkle key available?" >&2; exit 1; }
 fi
 
 ( cd "$OUT" && shasum -a 256 "$(basename "$DMG")" "$(basename "$ZIP")" > SHA256SUMS && cat SHA256SUMS )
