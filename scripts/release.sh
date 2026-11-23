@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build Aleno in Release and package it into dist/:
-#   Aleno.dmg            disk image with an Applications shortcut
+#   Aleno.dmg            disk image with a styled install window (app, arrow, Applications shortcut)
 #   Aleno-<version>-arm64.zip   the app bundle
 #   appcast.xml          the Sparkle update feed for this release (signed builds only, needs the Sparkle key)
 #   SHA256SUMS           checksums for both
@@ -44,13 +44,7 @@ VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/C
 ZIP="$OUT/Aleno-$VERSION-arm64.zip"
 DMG="$OUT/Aleno.dmg"
 
-make_dmg() {
-  local stage="$OUT/dmg"; mkdir -p "$stage"
-  ditto "$APP" "$stage/Aleno.app"
-  ln -s /Applications "$stage/Applications"
-  hdiutil create -volname Aleno -srcfolder "$stage" -ov -format UDZO "$DMG" >/dev/null
-  rm -rf "$stage"
-}
+make_dmg() { scripts/dmg/build.sh "$APP" "$DMG"; }     # styled window: light background, arrow to the Applications folder
 
 if [ "$UNSIGNED" = 1 ]; then
   echo "==> unsigned build: ad-hoc signature only, not notarized"
