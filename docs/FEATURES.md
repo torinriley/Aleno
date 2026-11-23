@@ -6,6 +6,8 @@ The first time Aleno runs, the logo materializes in dot-matrix lettering with a 
 
 It runs as the first thing in the new pane, in front of your shell, so it adds nothing to your shell's startup and leaves nothing in your history. See it again any time with Help, Welcome to Aleno.
 
+After an update, the same pane shows the logo again with the new version number and a short changelog, in place of the introduction. The changelog is `CHANGELOG.md`, built into the app, and covers every version since the one you last ran. `~/.config/aleno/.version` remembers which version you last saw. Releases need a `## <version>` section there: `scripts/check-versions.sh` fails without one.
+
 `workspace.welcome` controls it: `"first-launch"` (the default), `"always"` or `"never"`. In narrow windows the logo is left out and the text is shortened.
 
 ## About
