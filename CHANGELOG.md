@@ -4,6 +4,9 @@ Each release gets a section headed `## <version>`, newest first, with one short 
 section is what Aleno shows in the terminal after an update (see `crates/aleno-daemon/src/whatsnew.rs`), so keep
 the bullets to plain sentences. `scripts/check-versions.sh` fails when the current version has no section.
 
+## 0.1.5
+- After an update, Aleno shows the new version and what changed in the terminal.
+
 ## 0.1.4
 - A styled install window for the disk image, with an arrow from Aleno to the Applications folder.
 
