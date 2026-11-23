@@ -1,7 +1,7 @@
 //! The first-run welcome: `aleno-daemon welcome -- <shell> <arg0> [args...]`.
 //!
 //! It runs in a new pane before the user's shell: it draws the Aleno wordmark with a left-to-right reveal, prints a
-//! short introduction, then replaces itself with the shell (so the shell is the pane's process, exactly as if it had
+//! short introduction (or, after an update, the version and a short changelog, see `whatsnew.rs`), then replaces itself with the shell (so the shell is the pane's process, exactly as if it had
 //! been started directly). Any key skips the animation. When stdout is not a terminal it just starts the shell.
 
 use std::io::{self, Write};
@@ -42,7 +42,11 @@ pub fn logo_dots(cells: usize) -> Dots {
     let w = cells.clamp(8, 90) * 2;
     let lw = w - SHADOW;
     let lh = (lw * LOGO_H / LOGO_W).max(4);
-    let h = (lh + SHADOW).div_ceil(4) * 4;
+    // The round letters' tops start one third of the way down (the "l" is the tallest). Shift the logo so that row falls
+    // on a cell boundary: otherwise the 2 or 3 dot sliver at the very top of each round letter sits alone in its own
+    // cell row and looks like a small block floating above the letter.
+    let top = (4 - (lh / 3) % 4) % 4;
+    let h = (top + lh + SHADOW).div_ceil(4) * 4;
     let on = |x: usize, y: usize| -> bool {
         let (x0, x1) = (x * LOGO_W / lw, ((x + 1) * LOGO_W / lw).max(x * LOGO_W / lw + 1));
         let (y0, y1) = (y * LOGO_H / lh, ((y + 1) * LOGO_H / lh).max(y * LOGO_H / lh + 1));
@@ -66,8 +70,8 @@ pub fn logo_dots(cells: usize) -> Dots {
     for y in 0..lh {
         for x in 0..lw {
             if on(x, y) {
-                front[y * w + x] = true;
-                shadow[(y + SHADOW) * w + x + SHADOW] = true;
+                front[(y + top) * w + x] = true;
+                shadow[(y + top + SHADOW) * w + x + SHADOW] = true;
             }
         }
     }
@@ -193,7 +197,7 @@ fn key_pressed_within(ms: u64) -> bool {
     false
 }
 
-fn animate(out: &mut impl Write, cols: usize, rows: usize) {
+fn animate(out: &mut impl Write, cols: usize, rows: usize, lines: Vec<String>) {
     let indent = 2usize;
     let wide = cols >= 40 && rows >= 14;
     let _ = write!(out, "\x1b[?25l");
@@ -224,7 +228,7 @@ fn animate(out: &mut impl Write, cols: usize, rows: usize) {
         }
     }
     let pad = " ".repeat(indent);
-    for line in text_lines(cols) {
+    for line in lines {
         let _ = write!(out, "\r{}{}\x1b[K\r\n", pad, line);
         let _ = out.flush();
         if !skipped && key_pressed_within(if wide { 38 } else { 0 }) {
@@ -258,7 +262,12 @@ pub fn run(args: &[String]) -> i32 {
             unsafe { libc::tcsetattr(0, libc::TCSANOW, &raw) };
         }
         let (cols, rows) = terminal_size();
-        animate(&mut io::stdout().lock(), cols, rows);
+        let lines = match crate::whatsnew::pending_update() {
+            Some(from) => crate::whatsnew::banner_lines(cols, from.as_deref()),
+            None => text_lines(cols),
+        };
+        animate(&mut io::stdout().lock(), cols, rows, lines);
+        crate::whatsnew::record_seen();
         if have {
             unsafe { libc::tcsetattr(0, libc::TCSANOW, &saved) };
         }

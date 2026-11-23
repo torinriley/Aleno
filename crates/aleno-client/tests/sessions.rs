@@ -593,11 +593,12 @@ fn progress_from_the_shell_reaches_the_client_and_raises_an_event() {
     assert_eq!(c.shared.term.lock().unwrap().progress(), (0, 0));
 }
 
-#[test]
-fn welcome_pane_plays_the_intro_then_becomes_the_shell() {
-    let sock = tmp_sock("welcome");
-    let child = Command::new(daemon_bin()).arg("run").env("ALENO_SOCKET", &sock).env("ALENO_IDLE_EXIT_SECS", "0").spawn().unwrap();
-    let _guard = DaemonProc(child, sock.clone());
+/// Starts a daemon whose panes see `home` as $HOME, so the welcome's state files (.welcomed, .version) never touch the
+/// real ones.
+fn welcome_daemon(tag: &str, home: &std::path::Path) -> (PathBuf, DaemonProc, Ctl) {
+    let sock = tmp_sock(tag);
+    let child = Command::new(daemon_bin()).arg("run").env("ALENO_SOCKET", &sock).env("ALENO_IDLE_EXIT_SECS", "0").env("HOME", home).spawn().unwrap();
+    let guard = DaemonProc(child, sock.clone());
     let end = Instant::now() + Duration::from_secs(5);
     let ctl = loop {
         match Ctl::connect(&sock) {
@@ -606,6 +607,13 @@ fn welcome_pane_plays_the_intro_then_becomes_the_shell() {
             Err(e) => panic!("daemon did not start: {}", e),
         }
     };
+    (sock, guard, ctl)
+}
+
+#[test]
+fn welcome_pane_plays_the_intro_then_becomes_the_shell() {
+    let home = tmp_sock("welcome-home").parent().unwrap().to_path_buf();
+    let (sock, _guard, ctl) = welcome_daemon("welcome", &home);
     let s = ctl.create_session("welcome").unwrap();
     let p = ctl.create_pane_full(s, 100, 30, "/bin/sh", "/tmp", 1000, &[], true).unwrap();
     let c = attach(&sock, s, p, 100, 30);
@@ -619,4 +627,27 @@ fn welcome_pane_plays_the_intro_then_becomes_the_shell() {
     wait_for(&c, "shell works", |t| t.contains("after-welcome-42"));
     let infos = ctl.list_panes(s).unwrap();
     assert!(infos[0].alive);
+}
+
+#[test]
+fn welcome_pane_shows_the_changelog_after_an_update() {
+    // The welcome has been seen before, by an older version: the pane shows what's new instead of the intro.
+    let home = tmp_sock("whatsnew-home").parent().unwrap().to_path_buf();
+    std::fs::create_dir_all(home.join(".config/aleno")).unwrap();
+    std::fs::write(home.join(".config/aleno/.welcomed"), "").unwrap();
+    std::fs::write(home.join(".config/aleno/.version"), "0.0.1").unwrap();
+    let (sock, _guard, ctl) = welcome_daemon("whatsnew", &home);
+    let s = ctl.create_session("whatsnew").unwrap();
+    let p = ctl.create_pane_full(s, 100, 30, "/bin/sh", "/tmp", 1000, &[], true).unwrap();
+    let c = attach(&sock, s, p, 100, 30);
+    let t = wait_for(&c, "what's new", |t| t.contains("updated from 0.0.1") && t.contains("What's new"));
+    assert!(t.chars().any(|c| ('\u{2801}'..='\u{28FF}').contains(&c)), "the wordmark should be on screen:\n{}", t);
+    assert!(!t.contains("Welcome to Aleno"), "an update shows the changelog, not the introduction:\n{}", t);
+    c.send_input(b"q");
+    std::thread::sleep(Duration::from_millis(300));
+    c.send_input(b"echo after-banner-$((20+22))\n");
+    wait_for(&c, "shell works", |t| t.contains("after-banner-42"));
+    // The banner is shown once: the version it showed is now recorded.
+    let seen = std::fs::read_to_string(home.join(".config/aleno/.version")).unwrap();
+    assert_ne!(seen.trim(), "0.0.1");
 }

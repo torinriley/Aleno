@@ -170,20 +170,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/aleno/.welcomed")
     }
 
-    /// Whether the first window should play the welcome: always, never, or only until it has been shown once.
+    /// The version whose welcome or what's-new banner was last shown. The pane (aleno-daemon welcome) updates it
+    /// once it has shown the banner after an update.
+    private var versionMarker: URL { welcomeMarker.deletingLastPathComponent().appendingPathComponent(".version") }
+    private var currentVersion: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "" }
+
+    /// True when Aleno was updated since it last ran: the first-run welcome has been shown before, and the recorded
+    /// version is missing or differs from this build. The first window then plays the what's-new banner.
+    private func updatedSinceLastRun() -> Bool {
+        guard FileManager.default.fileExists(atPath: welcomeMarker.path) else { return false }
+        let last = (try? String(contentsOf: versionMarker, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return last != currentVersion
+    }
+
+    /// Whether the first window should play the welcome (the first-run introduction, or the what's-new banner after
+    /// an update): always, never, or until it has been shown once and after each update.
     private func shouldPlayWelcome() -> Bool {
         if ProcessInfo.processInfo.environment["ALENO_BENCH"] != nil { return false }
         switch ConfigStore.shared.settings.workspace.welcome {
         case "always": return true
         case "never": return false
-        default: return !FileManager.default.fileExists(atPath: welcomeMarker.path)
+        default: return !FileManager.default.fileExists(atPath: welcomeMarker.path) || updatedSinceLastRun()
         }
     }
 
     private func markWelcomeShown() {
         let dir = welcomeMarker.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let firstRun = !FileManager.default.fileExists(atPath: welcomeMarker.path)
         try? Data().write(to: welcomeMarker)
+        // A first run is not an update: record the version now so the pane shows the full introduction.
+        if firstRun { try? currentVersion.write(to: versionMarker, atomically: true, encoding: .utf8) }
     }
 
     /// Help, Welcome to Aleno: plays the welcome again in a new tab.

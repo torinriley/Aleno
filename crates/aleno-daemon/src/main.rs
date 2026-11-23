@@ -10,6 +10,7 @@
 //!   uninstall-launchd remove it
 
 mod welcome;
+mod whatsnew;
 
 use aleno_protocol::*;
 use aleno_session::Server;
