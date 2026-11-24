@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "aleno-client"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "aleno-protocol",
  "aleno-session",
@@ -15,7 +15,7 @@ dependencies = [
 
 [[package]]
 name = "aleno-daemon"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "aleno-protocol",
  "aleno-session",
@@ -25,14 +25,14 @@ dependencies = [
 
 [[package]]
 name = "aleno-protocol"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "aleno-session"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "aleno-protocol",
  "aleno-terminal",
@@ -42,7 +42,7 @@ dependencies = [
 
 [[package]]
 name = "aleno-terminal"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "unicode-width",
  "vte",
