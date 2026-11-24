@@ -4,6 +4,10 @@ Each release gets a section headed `## <version>`, newest first, with one short 
 section is what Aleno shows in the terminal after an update (see `crates/aleno-daemon/src/whatsnew.rs`), so keep
 the bullets to plain sentences. `scripts/check-versions.sh` fails when the current version has no section.
 
+## 0.1.7
+- Unicode, emoji and wide-character output is about twice as fast.
+- A zero-width joiner followed by plain text no longer swallows the next character.
+
 ## 0.1.6
 - Aleno checks for updates every time it launches, and asks before installing.
 
