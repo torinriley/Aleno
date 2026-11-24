@@ -22,12 +22,12 @@
 
 ---
 
-Aleno looks and behaves like a Mac app, because it is one. Real AppKit windows, a GPU-drawn text grid, and a small Rust core that does the terminal work. It starts in about 150 ms, sits at 0% CPU when idle, and keeps pace with the fastest terminals on a firehose of output.
+Aleno looks and behaves like a Mac app, because it is one. Real AppKit windows, a GPU-drawn text grid, and a small Rust core that does the terminal work. It starts in about 165 ms, sits near 0% CPU when idle, and keeps pace with the fastest terminals on a firehose of output.
 
 ## Why Aleno
 
 - **Native, not wrapped.** AppKit windows, a translucent tab strip, Finder integration and system notifications. No web view, no cross-platform toolkit.
-- **Fast where it counts.** About 150 ms from launch to first frame, 0.8 ms of GPU time per frame, and `cat` of a 135 MB file in about half a second, level with Ghostty. See [Performance](docs/PERFORMANCE.md).
+- **Fast where it counts.** About 165 ms from launch to first frame, 0.6 ms of GPU time per frame, and `cat` of a 100 MB file in a third of a second, level with Ghostty and several times faster than the rest. See [Performance](docs/PERFORMANCE.md).
 - **It knows what your commands did.** Failed commands get a red bar and an exit-code badge. `⌥⌘C` copies the last command's output. A command that runs for a while notifies you when it finishes, and tools like `brew` and `cargo` show live progress on the tab and the Dock icon.
 - **Tabs and splits done properly.** Drag a tab out to make a window. Reopen a closed tab with its history (`⌘⇧T`). Split any pane, as deep as you like.
 - **Beautiful by default.** Translucent windows with an adjustable blur or macOS Liquid Glass, programming ligatures, and a theme that follows the system.
