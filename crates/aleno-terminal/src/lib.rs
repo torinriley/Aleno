@@ -627,7 +627,7 @@ mod tests {
             b"\x1b[10;5H", b"\x1b[2J", b"\x1b[3b",
         ];
         for seed in 1..=400u64 {
-            let mut rng = Rng(seed * 0x9E37_79B9_7F4A_7C15 | 1);
+            let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
             let cols = 4 + rng.below(30);
             let rows = 2 + rng.below(8);
             let mut fast = Terminal::new(cols, rows, 200);
