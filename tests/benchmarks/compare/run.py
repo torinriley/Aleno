@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compares Aleno, Terminal.app, iTerm2 and Ghostty on the same Mac with identical workloads.
+"""Compares Aleno, Terminal.app, iTerm2, Ghostty, kitty, WezTerm and Alacritty on the same Mac with identical workloads.
 
 usage: run.py [--runs N] [--warmup N] [--data DIR] [--out results.json] [Aleno Terminal iTerm Ghostty ...]
 
@@ -8,7 +8,8 @@ zdot/.zshrc: it records when the shell was ready, then times four workloads (cat
 100 MB of plain text, `seq 1 3000000`, cat of 50 MB of unicode and emoji) and writes the timestamps to a file. The harness
 then measures memory and idle CPU of the instance, and kills only the processes that instance started.
 
-The terminals take turns (round robin) so that drift in the machine affects all of them equally, and the first --warmup
+Terminals that are not installed are skipped. Warp is measured separately by warp.sh: it needs the command to run as a
+real command block. The terminals take turns (round robin) so that drift in the machine affects all of them equally, and the first --warmup
 rounds are thrown away: a first launch is slower than every later one (Gatekeeper, first-run setup, cold caches).
 
 The terminals run with their default windows and settings, so this is the out-of-the-box experience. Close other
@@ -22,11 +23,19 @@ APPS = {
     "Terminal": "/System/Applications/Utilities/Terminal.app",
     "iTerm": "/Applications/iTerm.app",
     "Ghostty": "/Applications/Ghostty.app",
+    "kitty": "/Applications/kitty.app",
+    "WezTerm": "/Applications/WezTerm.app",
+    # Homebrew no longer ships an Alacritty cask (the official build fails Gatekeeper), so make_alacritty_app.sh builds
+    # it from source into this bundle.
+    "Alacritty": "/tmp/aleno-bench/Alacritty.app",
 }
 # Extra arguments per terminal. AppKit terminals are told not to restore windows; Ghostty gets its built-in defaults
 # (not the user's config) and no saved window state.
 ARGS = {
     "Ghostty": ["--config-default-files=false", "--window-save-state=never"],
+    "kitty": ["--config", "NONE"],
+    "WezTerm": ["--skip-config"],
+    "Alacritty": ["--config-file", "/dev/null"],
 }
 DEFAULT_ARGS = ["-ApplePersistenceIgnoreState", "YES"]
 WORK = ["color", "plain", "seq", "unicode"]
@@ -63,6 +72,7 @@ def run_once(name, bundle, data, tag):
     before = set(procs())
     env = [f"ZDOTDIR={HERE}/zdot", f"BENCH_RES={res}", f"BENCH_DIR={data}", "ALENO_WELCOME_SKIP=1",
            f"ALENO_SOCKET=/tmp/aleno-bench/{tag}.sock"]
+    env += [e for e in os.environ.get("BENCH_EXTRA_ENV", "").split(",") if e]   # extra NAME=value pairs for the app
     cmd = ["open", "-n", "-a", bundle]
     for e in env:
         cmd += ["--env", e]
@@ -115,7 +125,10 @@ def main():
     for b in a.bundle:
         name, path = b.split("=", 1)
         APPS[name] = os.path.abspath(path)
-    a.apps = a.apps or list(APPS)
+    a.apps = a.apps or [n for n, b in APPS.items() if os.path.exists(b)]
+    missing = [n for n in a.apps if not os.path.exists(APPS[n])]
+    if missing:
+        raise SystemExit("not installed: " + ", ".join(f"{n} ({APPS[n]})" for n in missing))
     os.makedirs("/tmp/aleno-bench", exist_ok=True)
     results = {name: [] for name in a.apps}
     for i in range(a.warmup + a.runs):
