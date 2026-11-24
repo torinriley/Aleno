@@ -136,6 +136,98 @@ impl Grid {
     }
 }
 
+/// Break a wide character that straddles `col` of `line` so no orphan half remains.
+#[inline]
+fn fix_wide_line(line: &mut Line, cols: usize, col: usize) {
+    let f = line.cells[col].flags;
+    if f & flags::WIDE != 0 && col + 1 < cols {
+        line.cells[col + 1].flags &= !flags::WIDE_CONT;
+        line.cells[col + 1].ch = b' ' as u32;
+    }
+    if f & flags::WIDE_CONT != 0 && col > 0 {
+        line.cells[col - 1].flags &= !flags::WIDE;
+        line.cells[col - 1].ch = b' ' as u32;
+    }
+}
+
+/// Display width of `c`: the common ranges answered directly, everything else by the Unicode tables. `None` for
+/// controls (C0, DEL, C1). A test checks the direct ranges against the tables.
+#[inline]
+pub(crate) fn char_width(c: char) -> Option<usize> {
+    match c as u32 {
+        0x20..=0x7e | 0xa0..=0xac | 0xae..=0x2ff => Some(1), // 0xad (soft hyphen) is zero width
+        0x4e00..=0x9fff | 0xac00..=0xd7a3 | 0x3041..=0x3096 | 0x30a1..=0x30fa => Some(2),
+        _ => c.width(),
+    }
+}
+
+/// Characters below this have their width in `width_table`; the rest ask the Unicode tables.
+const TABLE_LIMIT: usize = 0x2_0000;
+/// One byte per character below `TABLE_LIMIT` (the BMP and the emoji plane): 0, 1 or 2 columns, `NO_WIDTH` for
+/// controls. Built once from the Unicode tables, so one indexed load replaces a table walk per character.
+const NO_WIDTH: u8 = 255;
+fn width_table() -> &'static [u8] {
+    static TABLE: std::sync::OnceLock<Box<[u8]>> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        (0..TABLE_LIMIT as u32)
+            .map(|u| match char::from_u32(u).and_then(|c| c.width()) {
+                Some(w) => w as u8,
+                None => NO_WIDTH,
+            })
+            .collect()
+    })
+}
+
+/// Decode one UTF-8 sequence at the start of `s` (a non-ASCII lead byte). `None` for anything invalid, overlong,
+/// a surrogate, or cut off by the end of `s`: the caller leaves those to the VT parser, which handles them (and
+/// sequences split across reads) itself.
+#[inline(always)]
+fn decode_utf8(s: &[u8]) -> Option<(char, usize)> {
+    let b0 = s[0] as u32;
+    match s[0] {
+        0xC2..=0xDF => {
+            let b1 = *s.get(1)? as u32;
+            if b1 & 0xC0 != 0x80 {
+                return None;
+            }
+            Some((char::from_u32(((b0 & 0x1F) << 6) | (b1 & 0x3F))?, 2))
+        }
+        0xE0..=0xEF => {
+            let (b1, b2) = (*s.get(1)? as u32, *s.get(2)? as u32);
+            if (b1 | b2) & 0xC0 != 0x80 || (b1 & 0xC0) != 0x80 || (b2 & 0xC0) != 0x80 {
+                return None;
+            }
+            let u = ((b0 & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F);
+            if u < 0x800 {
+                return None; // overlong
+            }
+            Some((char::from_u32(u)?, 3)) // from_u32 rejects surrogates
+        }
+        0xF0..=0xF4 => {
+            let (b1, b2, b3) = (*s.get(1)? as u32, *s.get(2)? as u32, *s.get(3)? as u32);
+            if (b1 & 0xC0) != 0x80 || (b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80 {
+                return None;
+            }
+            let u = ((b0 & 0x07) << 18) | ((b1 & 0x3F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+            if u < 0x1_0000 {
+                return None; // overlong
+            }
+            Some((char::from_u32(u)?, 4)) // from_u32 rejects anything above U+10FFFF
+        }
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn width_table_for_test() -> (&'static [u8], usize, u8) {
+    (width_table(), TABLE_LIMIT, NO_WIDTH)
+}
+
+#[cfg(test)]
+pub(crate) fn decode_utf8_for_test(s: &[u8]) -> Option<(char, usize)> {
+    decode_utf8(s)
+}
+
 /// Maximum interned grapheme clusters / hyperlinks; beyond this, extra marks are dropped.
 const MAX_CLUSTERS: usize = 1 << 20;
 const MAX_LINKS: usize = 60000;
@@ -427,21 +519,12 @@ impl Screen {
     /// Break a wide character that straddles `col` so no orphan half remains.
     fn fix_wide(&mut self, row: usize, col: usize) {
         let cols = self.cols;
-        let line = self.g().row_mut(row);
-        let f = line.cells[col].flags;
-        if f & flags::WIDE != 0 && col + 1 < cols {
-            line.cells[col + 1].flags &= !flags::WIDE_CONT;
-            line.cells[col + 1].ch = b' ' as u32;
-        }
-        if f & flags::WIDE_CONT != 0 && col > 0 {
-            line.cells[col - 1].flags &= !flags::WIDE;
-            line.cells[col - 1].ch = b' ' as u32;
-        }
+        fix_wide_line(self.g().row_mut(row), cols, col);
     }
 
     fn put_char(&mut self, c: char) {
         let c = self.map_charset(c);
-        let w = match c.width() {
+        let w = match char_width(c) {
             Some(w) => w,
             None => return,
         };
@@ -451,8 +534,12 @@ impl Screen {
         }
         if self.last_zwj {
             self.last_zwj = false;
-            self.combine(c);
-            return;
+            // A joiner only joins the character after it when that is not plain ASCII (an emoji, say): a space or
+            // a letter after it is its own cell, whichever code path delivered it.
+            if !c.is_ascii() {
+                self.combine(c);
+                return;
+            }
         }
         let cols = self.cols;
         if self.pending_wrap {
@@ -592,6 +679,98 @@ impl Screen {
             }
             s = &s[n..];
         }
+    }
+
+    /// Fast path for text: a run of printable ASCII and valid UTF-8, in ground state, with the plain charset. Decodes
+    /// the characters itself (skipping the VT parser's per-character work) and writes whole row segments. Anything that
+    /// needs care (a character that would wrap or straddle the last column, zero-width marks, joiners, a pending wrap)
+    /// goes through `put_char`, so the result is identical to feeding the parser. Returns the bytes consumed: it
+    /// stops at a control byte, an escape, or anything it will not decode (invalid, or cut off by the end of `s`).
+    pub(crate) fn print_text(&mut self, s: &[u8]) -> usize {
+        let cur_cs = if self.gl == 0 { self.g0 } else { self.g1 };
+        if cur_cs != Charset::Ascii || self.insert_mode {
+            return 0;
+        }
+        let cols = self.cols;
+        let widths = width_table();
+        let mut i = 0;
+        while i < s.len() {
+            let r = self.crow;
+            let mut cc = self.ccol;
+            let (fg, bg, fl, link) = (self.pen.fg, self.pen.bg, self.pen.flags, self.cur_link);
+            let mut zwj = self.last_zwj;
+            let mut last = None;
+            if !self.pending_wrap {
+                let line = self.grids[self.alt as usize].row_mut(r);
+                while i < s.len() {
+                    let b = s[i];
+                    let (c, len) = if b < 0x80 {
+                        if !(0x20..0x7f).contains(&b) {
+                            break;
+                        }
+                        zwj = false; // printable ASCII ends a ZWJ sequence, as in print_ascii
+                        (b as char, 1)
+                    } else {
+                        match decode_utf8(&s[i..]) {
+                            Some(x) => x,
+                            None => break,
+                        }
+                    };
+                    let w = match widths.get(c as usize).copied() {
+                        Some(w @ 1..=2) => w as usize,
+                        Some(_) => break, // zero width or a control: put_char decides
+                        None => match c.width() {
+                            Some(w @ 1..=2) => w,
+                            _ => break,
+                        },
+                    };
+                    if (zwj && b >= 0x80) || cc + w >= cols {
+                        break; // joins the previous cell, or reaches the last column (wrap state): put_char
+                    }
+                    if line.cells[cc].flags & (flags::WIDE | flags::WIDE_CONT) != 0 {
+                        fix_wide_line(line, cols, cc);
+                    }
+                    if w == 1 {
+                        line.cells[cc] = Cell { ch: c as u32, fg, bg, flags: fl, link };
+                    } else {
+                        if line.cells[cc + 1].flags & (flags::WIDE | flags::WIDE_CONT) != 0 {
+                            fix_wide_line(line, cols, cc + 1);
+                        }
+                        line.cells[cc] = Cell { ch: c as u32, fg, bg, flags: fl | flags::WIDE, link };
+                        line.cells[cc + 1] = Cell { ch: b' ' as u32, fg, bg, flags: fl | flags::WIDE_CONT, link };
+                    }
+                    cc += w;
+                    last = Some(c);
+                    i += len;
+                }
+            }
+            if let Some(c) = last {
+                self.mark(r);
+                self.ccol = cc;
+                self.last_char = Some(c);
+            }
+            self.last_zwj = zwj;
+            if i >= s.len() {
+                break;
+            }
+            // The next character needs the general path (or ends the run).
+            let b = s[i];
+            let (c, len) = if b < 0x80 {
+                if !(0x20..0x7f).contains(&b) {
+                    break;
+                }
+                self.last_zwj = false;
+                (b as char, 1)
+            } else {
+                match decode_utf8(&s[i..]) {
+                    Some(x) => x,
+                    None => break,
+                }
+            };
+            self.put_char(c);
+            i += len;
+        }
+        i
     }
 
     /// Attach a zero-width character to the previously printed cell.

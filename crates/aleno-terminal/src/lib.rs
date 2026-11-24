@@ -15,6 +15,8 @@ use unicode_width::UnicodeWidthChar;
 pub struct Terminal {
     parser: vte::Parser,
     s: Screen,
+    /// Decode runs of non-ASCII text directly (see `Screen::print_text`). Tests turn it off to get the reference result.
+    text_fast: bool,
 }
 
 /// One OSC 133 command block. `repr(C)` for FFI; rows are line indexes into history+screen, -1 when unknown.
@@ -76,7 +78,7 @@ pub struct Match {
 
 impl Terminal {
     pub fn new(cols: usize, rows: usize, scrollback: usize) -> Terminal {
-        Terminal { parser: vte::Parser::new(), s: Screen::new(cols, rows, scrollback) }
+        Terminal { parser: vte::Parser::new(), s: Screen::new(cols, rows, scrollback), text_fast: true }
     }
 
     /// When false (GUI mirror), device-status queries are not answered; the daemon answers them.
@@ -97,6 +99,14 @@ impl Terminal {
                 if i > start {
                     self.s.print_ascii(&bytes[start..i]);
                     continue;
+                }
+                // Text with non-ASCII characters: decode and write runs directly.
+                if bytes[i] >= 0xC2 && self.text_fast {
+                    let used = self.s.print_text(&bytes[i..]);
+                    if used > 0 {
+                        i += used;
+                        continue;
+                    }
                 }
                 // Plain SGR (`ESC [ n ; n m`, digits and ';' only): parse inline, skipping the general CSI machinery.
                 if bytes[i] == 0x1b && i + 2 < n && bytes[i + 1] == b'[' {
@@ -525,4 +535,121 @@ impl Terminal {
 /// Terminal cell width of a string (used by the GUI for sizing helpers and in tests).
 pub fn str_width(s: &str) -> usize {
     s.chars().map(|c| c.width().unwrap_or(0)).sum()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Deterministic pseudo-random numbers (xorshift), so a failure reproduces.
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+        fn below(&mut self, n: usize) -> usize {
+            (self.next() % n as u64) as usize
+        }
+    }
+
+    fn same(a: &Terminal, b: &Terminal, what: &str) {
+        assert_eq!(a.cursor(), b.cursor(), "cursor, {}", what);
+        assert_eq!(a.scrollback_len(), b.scrollback_len(), "scrollback, {}", what);
+        assert_eq!(a.snapshot_vt(100_000), b.snapshot_vt(100_000), "snapshot, {}", what);
+        // Cluster ids depend on the order clusters were first seen, so compare what they spell.
+        let norm = |t: &Terminal, r: usize, c: usize| {
+            let mut cell = t.cell(r, c);
+            let text = if cell.ch & CLUSTER_FLAG != 0 { Some(t.cluster(cell.ch)) } else { None };
+            cell.ch = if text.is_some() { CLUSTER_FLAG } else { cell.ch };
+            (cell, text)
+        };
+        for r in 0..a.rows() {
+            for c in 0..a.cols() {
+                assert_eq!(norm(a, r, c), norm(b, r, c), "cell {},{}, {}", r, c, what);
+            }
+        }
+    }
+
+    #[test]
+    fn direct_width_ranges_match_the_unicode_tables() {
+        let mut bad = Vec::new();
+        for u in 0u32..0x11_0000 {
+            if let Some(c) = char::from_u32(u) {
+                if screen::char_width(c) != c.width() {
+                    bad.push(format!("U+{:04X}", u));
+                }
+            }
+        }
+        assert!(bad.is_empty(), "direct ranges disagree with the tables for: {:?}", bad);
+    }
+
+    #[test]
+    fn width_table_matches_the_unicode_tables() {
+        let (table, limit, none) = screen::width_table_for_test();
+        assert_eq!(table.len(), limit);
+        for u in 0..limit as u32 {
+            let want = char::from_u32(u).and_then(|c| c.width()).map(|w| w as u8).unwrap_or(none);
+            assert_eq!(table[u as usize], want, "U+{:04X}", u);
+        }
+    }
+
+    #[test]
+    fn utf8_decoder_agrees_with_std() {
+        for u in 0x80u32..0x11_0000 {
+            if let Some(c) = char::from_u32(u) {
+                let mut b = [0u8; 4];
+                let e = c.encode_utf8(&mut b).as_bytes().to_vec();
+                assert_eq!(screen::decode_utf8_for_test(&e), Some((c, e.len())), "U+{:04X}", u);
+                if e.len() > 1 {
+                    assert_eq!(screen::decode_utf8_for_test(&e[..e.len() - 1]), None, "truncated U+{:04X}", u);
+                }
+            }
+        }
+        for bad in [&[0xC0u8, 0x80][..], &[0xE0, 0x80, 0x80], &[0xED, 0xA0, 0x80], &[0xF4, 0x90, 0x80, 0x80], &[0xFF], &[0x80], &[0xC3, 0x28]] {
+            assert_eq!(screen::decode_utf8_for_test(bad), None, "{:?}", bad);
+        }
+    }
+
+    /// The fast text path must leave exactly the state the VT parser path would: random text mixing ASCII, wide and
+    /// combining characters, emoji sequences, controls, SGR, invalid bytes, in narrow windows and split into random
+    /// chunks.
+    #[test]
+    fn text_fast_path_matches_the_parser() {
+        let pieces: Vec<&[u8]> = vec![
+            b"hello", b" ", b"world ", b"x", b"\r\n", b"\r", b"\n", b"\t", b"\x08", b"\x1b[31m", b"\x1b[0m", b"\x1b[1;4m",
+            "日本語".as_bytes(), "한국어".as_bytes(), "ひらがな".as_bytes(), "é".as_bytes(), "naïve".as_bytes(),
+            "e\u{301}".as_bytes(), "😀".as_bytes(), "🚀🔥".as_bytes(), "👨\u{200d}👩\u{200d}👧".as_bytes(), "❤\u{fe0f}".as_bytes(),
+            "🇯🇵".as_bytes(), "\u{200d}".as_bytes(), "\u{fe0f}".as_bytes(), "✓→═│".as_bytes(), "\u{85}".as_bytes(),
+            b"\xff", b"\xc3", b"\xe6\x97", b"\x1b[2K", b"\x1b[3G", b"\x1b[?7l", b"\x1b[?7h", b"\x1b[4h", b"\x1b[4l", b"\x1b(0", b"\x1b(B",
+            b"\x1b[10;5H", b"\x1b[2J", b"\x1b[3b",
+        ];
+        for seed in 1..=400u64 {
+            let mut rng = Rng(seed * 0x9E37_79B9_7F4A_7C15 | 1);
+            let cols = 4 + rng.below(30);
+            let rows = 2 + rng.below(8);
+            let mut fast = Terminal::new(cols, rows, 200);
+            let mut reference = Terminal::new(cols, rows, 200);
+            reference.text_fast = false; // the same feed, without the direct text path
+            for _ in 0..40 {
+                let mut data = Vec::new();
+                for _ in 0..1 + rng.below(25) {
+                    data.extend_from_slice(pieces[rng.below(pieces.len())]);
+                }
+                // Same bytes, split at random places, so partial sequences cross reads.
+                let mut at = 0;
+                while at < data.len() {
+                    let n = 1 + rng.below(9);
+                    let end = (at + n).min(data.len());
+                    fast.feed(&data[at..end]);
+                    reference.feed(&data[at..end]);
+                    same(&fast, &reference, &format!("seed {}, {}x{}, chunk {:?} of {:?}", seed, cols, rows, String::from_utf8_lossy(&data[at..end]), String::from_utf8_lossy(&data)));
+                    at = end;
+                }
+                same(&fast, &reference, &format!("seed {}, {}x{}, last data {:?}", seed, cols, rows, String::from_utf8_lossy(&data)));
+            }
+        }
+    }
 }
