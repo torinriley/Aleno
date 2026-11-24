@@ -16,6 +16,10 @@
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-black">
 </p>
 
+<p align="center">
+  <code>brew tap torinriley/aleno https://github.com/torinriley/Aleno &amp;&amp; brew install --cask aleno</code>
+</p>
+
 ---
 
 Aleno looks and behaves like a Mac app, because it is one. Real AppKit windows, a GPU-drawn text grid, and a small Rust core that does the terminal work. It starts in about 150 ms, sits at 0% CPU when idle, and keeps pace with the fastest terminals on a firehose of output.
