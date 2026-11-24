@@ -16,6 +16,10 @@
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-black">
 </p>
 
+<p align="center">
+  <code>brew tap torinriley/aleno https://github.com/torinriley/Aleno &amp;&amp; brew install --cask aleno</code>
+</p>
+
 ---
 
 Aleno looks and behaves like a Mac app, because it is one. Real AppKit windows, a GPU-drawn text grid, and a small Rust core that does the terminal work. It starts in about 150 ms, sits at 0% CPU when idle, and keeps pace with the fastest terminals on a firehose of output.
@@ -34,7 +38,16 @@ Aleno looks and behaves like a Mac app, because it is one. Real AppKit windows, 
 
 ## Install
 
-Download the latest notarized `Aleno.dmg` from the [Releases](https://github.com/torinriley/Aleno/releases) page, open it, and drag Aleno to Applications.
+With [Homebrew](https://brew.sh):
+
+```bash
+brew tap torinriley/aleno https://github.com/torinriley/Aleno
+brew install --cask aleno
+```
+
+This always installs the latest release. Aleno then updates itself: it checks for a new version every time it launches and asks before installing.
+
+Or download the latest notarized `Aleno.dmg` from the [Releases](https://github.com/torinriley/Aleno/releases) page, open it, and drag Aleno to Applications.
 
 Requires macOS 15 or later on Apple Silicon.
 
