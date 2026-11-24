@@ -101,3 +101,7 @@ How it fits together:
    Then delete the exported file. Keep a backup somewhere safe: if the key is lost, installed copies of Aleno can never verify another update, and users have to reinstall by hand.
 
 The first release that contains the updater has to be installed manually; from then on, installs update themselves.
+
+## Homebrew
+
+`Casks/aleno.rb` makes this repository a Homebrew tap. It points at `releases/latest/download/Aleno.dmg`, which GitHub redirects to the newest release, so a release needs no change to the cask as long as the disk image keeps the name `Aleno.dmg`. It is declared `version :latest` with no checksum, and `auto_updates true` because Sparkle updates the app itself. Check changes to it with `brew style Casks/aleno.rb`.
